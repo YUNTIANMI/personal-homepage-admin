@@ -56,11 +56,7 @@ export function ProjectsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHead
-        kicker="// Projects · Open Source"
-        title="软件项目"
-        desc="项目数据全部由此处维护：新增时填写名称、简介与外链地址（如 GitHub），保存后卡片即可点击跳转。"
-      />
+      <PageHead kicker="// Projects · Open Source" title="软件项目" />
 
       {/* 工具条 */}
       <div className="flex flex-wrap items-center gap-2.5">

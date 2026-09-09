@@ -6,11 +6,7 @@ import { SITE } from '../lib/site'
 export function AboutPage() {
   return (
     <div className="space-y-6">
-      <PageHead
-        kicker="// About · LUOJI"
-        title="关于我"
-        desc="以下为个人名片信息，来源为 src/lib/site.ts 配置，可随时替换为真实内容。"
-      />
+      <PageHead kicker="// About · LUOJI" title="关于我" />
 
       <div className="grid items-stretch gap-6 lg:grid-cols-2">
         {/* 自我介绍：通栏 */}
@@ -69,9 +65,6 @@ export function AboutPage() {
               </a>
             )}
           </div>
-          <p className="mt-5 font-mono text-[13px] text-ink-faint">
-            // 邮箱与 GitHub 地址请到 src/lib/site.ts 中配置
-          </p>
         </section>
       </div>
     </div>

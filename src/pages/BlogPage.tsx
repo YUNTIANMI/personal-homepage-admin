@@ -81,11 +81,7 @@ export function BlogPage({
 
   return (
     <div className="space-y-6">
-      <PageHead
-        kicker="// Blog · Markdown Powered"
-        title="博客文章"
-        desc="全部数据由下方列表管理：新增、编辑、单行删除与批量删除都会直接更新内存仓库并即时刷新。"
-      />
+      <PageHead kicker="// Blog · Markdown Powered" title="博客文章" />
 
       {/* 工具条 */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

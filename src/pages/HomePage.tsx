@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ArrowRight, FileText, FolderGit2, PenLine } from 'lucide-react'
+import { ArrowRight, FileText, FolderGit2 } from 'lucide-react'
 import type { View } from '../types'
 import { useStore } from '../store'
 import { cn } from '../components/ui'
@@ -61,12 +61,6 @@ function SiteStats({ onNavigate }: { onNavigate: (v: View) => void }) {
         caption="个软件项目 · 一键跳转 GitHub"
         onClick={() => onNavigate('projects')}
       />
-      <StatRow
-        icon={<PenLine size={20} />}
-        value="数据由你维护"
-        caption="在「博客 / 项目」页点击新增即可录入，刷新页面后归零（内存仓库）"
-        valueClass="text-sm font-semibold"
-      />
     </>
   )
 }
@@ -98,7 +92,7 @@ export function HomePage({ onNavigate }: { onNavigate: (v: View) => void }) {
               你好，我是<span className="text-brand">{SITE.name}</span>
             </h1>
             <p className="mt-4 font-mono text-lg text-ink-soft">
-              <span className="text-ink-faint">$</span> {SITE.headline}
+              <span className="text-ink-faint"></span> {SITE.headline}
             </p>
             {/* 正文：1.0625rem 起，随根字号放大，不再被固定 px 压回小字 */}
             <p className="mt-6 max-w-2xl text-[1.0625rem] leading-relaxed text-ink-soft">
@@ -138,7 +132,7 @@ export function HomePage({ onNavigate }: { onNavigate: (v: View) => void }) {
       </section>
 
       {/* 窄屏数据概览（lg 以下展示，样式与原布局一致） */}
-      <section className="grid gap-4 sm:grid-cols-3 lg:hidden">
+      <section className="grid gap-4 sm:grid-cols-2 lg:hidden">
         <SiteStats onNavigate={onNavigate} />
       </section>
     </div>
