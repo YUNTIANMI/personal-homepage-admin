@@ -108,16 +108,16 @@ export function HomePage({ onNavigate }: { onNavigate: (v: View) => void }) {
               <button
                 type="button"
                 onClick={() => onNavigate('blog')}
-                className="focus-ring inline-flex h-11 items-center gap-2 rounded-lg bg-brand px-6 text-[15px] font-medium text-white shadow-sm transition-colors hover:bg-brand-strong"
+                className="focus-ring inline-flex h-12 items-center gap-2.5 rounded-lg bg-brand px-7 text-[0.9375rem] font-semibold text-white shadow-sm transition-colors hover:bg-brand-strong"
               >
-                浏览博客 <ArrowRight size={17} />
+                浏览博客 <ArrowRight size={18} />
               </button>
               <button
                 type="button"
                 onClick={() => onNavigate('projects')}
-                className="focus-ring inline-flex h-11 items-center gap-2 rounded-lg border border-line-strong bg-surface px-6 text-[15px] font-medium text-ink transition-colors hover:border-brand hover:text-brand"
+                className="focus-ring inline-flex h-12 items-center gap-2.5 rounded-lg border border-line-strong bg-surface px-7 text-[0.9375rem] font-semibold text-ink transition-colors hover:border-brand hover:text-brand"
               >
-                查看项目 <FolderGit2 size={17} />
+                查看项目 <FolderGit2 size={18} />
               </button>
             </div>
           </div>

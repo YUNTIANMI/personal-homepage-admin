@@ -26,7 +26,7 @@ const variantCls: Record<BtnVariant, string> = {
 
 const sizeCls: Record<BtnSize, string> = {
   sm: 'h-9 gap-1.5 px-3.5 text-[13px]',
-  md: 'h-11 gap-2 px-5 text-[15px]',
+  md: 'h-12 gap-2 px-6 text-[0.9375rem]',
 }
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
