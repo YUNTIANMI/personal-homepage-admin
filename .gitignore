@@ -1,0 +1,14 @@
+# 依赖与构建产物
+node_modules/
+dist/
+
+# 本地运行与临时产物
+.dev-server.log
+.tmp-shots/
+
+# IDE / 工具本地数据（非源码，不应入库）
+.codebuddy/
+
+# 系统文件
+Thumbs.db
+.DS_Store
