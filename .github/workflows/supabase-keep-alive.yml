@@ -24,8 +24,23 @@ jobs:
             echo "未配置 SUPABASE_URL / SUPABASE_ANON_KEY，跳过保活"
             exit 0
           fi
+          # 规范化地址：去空白、去结尾斜杠、去可能被一起复制进来的 /rest/v1 路径，
+          # 避免拼接后出现 .../rest/v1//rest/v1/... 导致 404。
+          BASE="$(echo -n "${{ secrets.SUPABASE_URL }}" | tr -d '[:space:]')"
+          BASE="${BASE%/}"
+          BASE="${BASE%/rest/v1}"
+          BASE="${BASE%/}"
+          URL="$BASE/rest/v1/posts?select=id&limit=1"
+          echo "请求地址: $URL"
           code=$(curl -sS -o /dev/null -w "%{http_code}" \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/posts?select=id&limit=1" \
+            "$URL" \
             -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
           echo "Supabase 响应状态码: $code"
+          if [ "$code" = "200" ]; then
+            echo "保活成功：数据库连接正常"
+          elif [ "$code" = "401" ] || [ "$code" = "403" ]; then
+            echo "::warning::密钥无效或权限不足，请检查 Secret 中的 anon / publishable key"
+          elif [ "$code" = "404" ]; then
+            echo "::warning::表不存在：请在 Supabase SQL Editor 中执行 README 里的建表 SQL（posts / projects）"
+          fi
