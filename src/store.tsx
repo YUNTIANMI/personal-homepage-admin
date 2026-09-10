@@ -1,21 +1,29 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
   useReducer,
+  useState,
   type Dispatch,
   type ReactNode,
 } from 'react'
 import type { Post, Project } from './types'
 import { todayISO } from './utils'
+import {
+  COLLECTIONS,
+  cloudEnabled,
+  fetchAllData,
+  removeDocs,
+  upsertDoc,
+} from './lib/cloud'
 
 /**
- * 本地持久化仓库（浏览器 localStorage）：
- * - 首次访问（本地无数据）时载入内置示例文章；
- * - 之后所有新增 / 编辑 / 删除都会写回本地存储，刷新页面数据不会丢失；
- * - 删除示例文章后不会再“复活”，只有清空浏览器存储才会重新载入示例。
- * - 如需多设备同步，可将 loadState / 写回替换为云端数据库（CloudBase / Supabase 等）。
+ * 数据仓库：
+ * - 配置了 VITE_TCB_ENV_ID 时走【云端存储】：启动从云数据库拉取，增删改即时同步到云端，
+ *   换电脑 / 换浏览器都能看到同一份数据（localStorage 仅作为离线缓存兜底）；
+ * - 未配置时走【本地模式】：数据只存在当前浏览器，首次访问载入内置示例文章。
  */
 
 /** 内置示例文章的 id（示例仅 1 条，标注「示例 · 可删除」） */
@@ -96,12 +104,17 @@ export type Action =
   | { type: 'project/add'; project: Project }
   | { type: 'project/update'; project: Project }
   | { type: 'project/delete'; ids: string[] }
+  /** 用云端返回的数据整体替换（初始化拉取时使用，不触发回写） */
+  | { type: 'state/replace'; posts: Post[]; projects: Project[] }
 
-/** 本地存储键（带版本号，便于后续数据结构升级时迁移） */
+/** 数据来源状态：本地模式 / 云端加载中 / 已同步 / 同步失败 */
+export type SyncStatus = 'local' | 'loading' | 'synced' | 'error'
+
+/** 本地缓存键（保持原键名不变，避免老用户已有数据丢失） */
 const STORAGE_KEY = 'luoji.store.v1'
 
-/** 读取本地数据；无数据 / 解析失败时回退到内置示例 */
-function loadState(): State {
+/** 读取本地缓存；无数据 / 解析失败时返回 null */
+function readLocalCache(): State | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
@@ -111,9 +124,39 @@ function loadState(): State {
       }
     }
   } catch {
-    /* 数据损坏或浏览器禁用存储：使用示例数据兜底 */
+    /* 数据损坏或浏览器禁用存储：忽略，走兜底逻辑 */
   }
-  return { posts: buildSeedPosts(), projects: [] }
+  return null
+}
+
+/**
+ * 初始状态：
+ * - 有本地缓存 → 先用缓存渲染（首屏不闪空白），云端拉取后再覆盖；
+ * - 无缓存且未启用云端 → 注入内置示例文章；
+ * - 无缓存且启用云端 → 返回空，等云端数据（不把示例写进云）。
+ */
+function loadState(): State {
+  const cached = readLocalCache()
+  if (cached) return cached
+  return cloudEnabled ? { posts: [], projects: [] } : { posts: buildSeedPosts(), projects: [] }
+}
+
+/** 把一次本地操作转换为对应的云端写请求 */
+function syncToCloud(action: Action): Promise<void>[] {
+  switch (action.type) {
+    case 'post/add':
+    case 'post/update':
+      return [upsertDoc(COLLECTIONS.posts, action.post)]
+    case 'project/add':
+    case 'project/update':
+      return [upsertDoc(COLLECTIONS.projects, action.project)]
+    case 'post/delete':
+      return [removeDocs(COLLECTIONS.posts, action.ids)]
+    case 'project/delete':
+      return [removeDocs(COLLECTIONS.projects, action.ids)]
+    default:
+      return []
+  }
 }
 
 function reducer(state: State, action: Action): State {
@@ -142,6 +185,8 @@ function reducer(state: State, action: Action): State {
       }
     case 'project/delete':
       return { ...state, projects: state.projects.filter((p) => !action.ids.includes(p.id)) }
+    case 'state/replace':
+      return { posts: action.posts, projects: action.projects }
     default:
       return state
   }
@@ -151,14 +196,19 @@ interface StoreValue {
   posts: Post[]
   projects: Project[]
   dispatch: Dispatch<Action>
+  /** 是否启用了云端存储 */
+  cloudEnabled: boolean
+  /** 云端同步状态，可用于界面提示 */
+  syncStatus: SyncStatus
 }
 
 const StoreContext = createContext<StoreValue | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, loadState)
+  const [state, dispatchBase] = useReducer(reducer, undefined, loadState)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(cloudEnabled ? 'loading' : 'local')
 
-  // 数据变化即写回本地存储，刷新 / 关闭浏览器后仍然保留
+  // 本地缓存（离线兜底 + 首屏秒开）
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
@@ -167,7 +217,58 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [state])
 
-  const value = useMemo(() => ({ ...state, dispatch }), [state])
+  // 启动时从云端拉取：以云端数据为准
+  useEffect(() => {
+    if (!cloudEnabled) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const remote = await fetchAllData()
+        if (cancelled) return
+
+        // 首次启用云端（云端为空而本地有数据）→ 把本地数据迁移上传，避免丢失
+        if (remote.posts.length === 0 && remote.projects.length === 0) {
+          const local = readLocalCache()
+          if (local && (local.posts.length > 0 || local.projects.length > 0)) {
+            await Promise.all([
+              ...local.posts.map((p) => upsertDoc(COLLECTIONS.posts, p)),
+              ...local.projects.map((j) => upsertDoc(COLLECTIONS.projects, j)),
+            ])
+            if (!cancelled) setSyncStatus('synced')
+            return
+          }
+        }
+
+        dispatchBase({ type: 'state/replace', posts: remote.posts, projects: remote.projects })
+        setSyncStatus('synced')
+      } catch (err) {
+        console.error('[cloud] 读取云端数据失败：', err)
+        if (!cancelled) setSyncStatus('error')
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // 包装 dispatch：先本地更新（界面即时响应），再异步同步到云端
+  const dispatch = useCallback<Dispatch<Action>>((action) => {
+    dispatchBase(action)
+    if (!cloudEnabled || action.type === 'state/replace') return
+    const tasks = syncToCloud(action)
+    if (tasks.length === 0) return
+    void Promise.all(tasks)
+      .then(() => setSyncStatus('synced'))
+      .catch((err) => {
+        console.error('[cloud] 写入云端失败：', err)
+        setSyncStatus('error')
+      })
+  }, [])
+
+  const value = useMemo(
+    () => ({ ...state, dispatch, cloudEnabled, syncStatus }),
+    [state, dispatch, syncStatus],
+  )
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }
 

@@ -9,6 +9,11 @@ dist/
 # IDE / 工具本地数据（非源码，不应入库）
 .codebuddy/
 
+# 环境变量文件（含密钥，禁止提交）
+.env
+.env.local
+.env*.local
+
 # 系统文件
 Thumbs.db
 .DS_Store

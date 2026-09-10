@@ -106,11 +106,59 @@ npm run typecheck
 - **新增项目**：进入「项目」页 → 「新增项目」→ 填写名称 / 简介 / 技术标签，并至少添加一条外链（如 GitHub）
 - **个人资料**：站点名称、一句话介绍、GitHub / 邮箱、技能栈在 `src/lib/site.ts` 中配置
 
-> 数据存储机制在 `src/store.tsx`：`loadState()` 负责读取（无数据时注入示例），`StoreProvider` 在每次数据变化时写回 localStorage。
+> 数据存储机制：`src/store.tsx` + `src/lib/cloud.ts`
+> - **未配置云端** → 本地模式：数据存 localStorage（键 `luoji.store.v1`），仅当前浏览器有效
+> - **配置了云端** → 云端模式：云数据库为权威数据源，localStorage 仅作离线缓存
 >
-> 想恢复出厂示例数据：浏览器 DevTools → Application → Local Storage → 删除 `luoji.store.v1`，刷新即可。
+> 想恢复出厂示例数据（本地模式）：DevTools → Application → Local Storage → 删除 `luoji.store.v1`，刷新即可。
+
+## 云端存储（换电脑也能看到数据）
+
+默认走浏览器本地存储，**换电脑 / 换浏览器数据不通用**。接入 **Supabase**（免费）后即切换为云端存储（纯前端直连，无需自建后端）：
+
+1. 注册 [supabase.com](https://supabase.com)，**New project** 新建项目（免费版；区域选离你较近的，如 Singapore）
+2. 打开 **SQL Editor**，粘贴执行下面这段 SQL（建两张表 + 开放匿名读写权限）：
+
+```sql
+-- 文章表
+create table if not exists public.posts (
+  id text primary key,
+  title text not null default '',
+  date text default '',
+  category text default '',
+  tags jsonb not null default '[]'::jsonb,
+  description text default '',
+  content text default '',
+  "isSample" boolean not null default false
+);
+
+-- 项目表
+create table if not exists public.projects (
+  id text primary key,
+  name text not null default '',
+  tagline text default '',
+  tech jsonb not null default '[]'::jsonb,
+  links jsonb not null default '[]'::jsonb,
+  "isSample" boolean not null default false
+);
+
+-- 开启行级安全（RLS）并允许匿名读写（个人站点可用；多人/生产环境请收紧）
+alter table public.posts enable row level security;
+alter table public.projects enable row level security;
+
+create policy "posts anon all" on public.posts
+  for all to anon using (true) with check (true);
+create policy "projects anon all" on public.projects
+  for all to anon using (true) with check (true);
+```
+
+3. 打开 **Project Settings → API**，复制 **Project URL** 与 **anon public key**
+4. 复制 `.env.example` 为 `.env.local`，填入这两项，重启 `npm run dev`
+5. 页脚显示「云端同步正常」即接入成功；**首次启用会自动把当前浏览器里已有的文章 / 项目迁移到云端**
+
+> 换电脑时填同一组 URL + Key 即可看到同一份数据；云端不可用时会自动回退本地缓存，并在页脚提示「云端同步失败」。
 >
-> 注意：本方案为**单浏览器本地存储**，换设备 / 换浏览器 / 清空浏览器数据都会丢失，也不会多端同步。如需多设备同步，可把 `src/store.tsx` 的读写替换为云端数据库（CloudBase / Supabase 等）。
+> **免费版保活**：Supabase 免费项目 7 天无请求会被暂停，仓库已内置 [`.github/workflows/supabase-keep-alive.yml`](.github/workflows/supabase-keep-alive.yml)，每 5 天自动请求一次。启用前需在 GitHub 仓库 → Settings → Secrets and variables → Actions 添加 `SUPABASE_URL` 与 `SUPABASE_ANON_KEY` 两个 Secret。
 
 ## 个性化配置
 

@@ -1,6 +1,7 @@
 import { Moon, Sun } from 'lucide-react'
 import type { View } from '../types'
 import { SITE } from '../lib/site'
+import { useStore } from '../store'
 import { BrandLogo } from './icons'
 import { cn } from './ui'
 
@@ -111,14 +112,34 @@ export function Header({
 }
 
 export function Footer() {
+  const { cloudEnabled, syncStatus } = useStore()
+
+  // 数据存储状态提示（便于确认数据到底存在哪）
+  const storageLabel = !cloudEnabled
+    ? '本地存储 · 数据仅保存在当前浏览器'
+    : syncStatus === 'loading'
+      ? '云端同步中…'
+      : syncStatus === 'error'
+        ? '云端同步失败 · 已回退本地缓存'
+        : '云端同步正常'
+
   return (
     <footer className="mt-16 border-t border-line/80">
       <div className="flex w-full flex-col items-center justify-between gap-2 px-4 py-7 text-sm text-ink-faint sm:flex-row sm:px-6 lg:px-8 xl:px-10">
         <p>
           © {SITE.startYear} {SITE.name} · {SITE.role}
         </p>
-        <p className="font-mono">
-          built with React + Vite + Tailwind CSS · content-as-code
+        <p className="flex items-center gap-2 font-mono">
+          {cloudEnabled && (
+            <span
+              aria-hidden="true"
+              className={cn(
+                'inline-block size-1.5 shrink-0 rounded-full',
+                syncStatus === 'error' ? 'bg-danger' : 'bg-ok',
+              )}
+            />
+          )}
+          {storageLabel}
         </p>
       </div>
     </footer>
