@@ -6,7 +6,6 @@ import {
   useMemo,
   useReducer,
   useState,
-  type Dispatch,
   type ReactNode,
 } from 'react'
 import type { Post, Project } from './types'
@@ -142,6 +141,40 @@ function loadState(): State {
   return cloudEnabled ? { posts: [], projects: [] } : { posts: buildSeedPosts(), projects: [] }
 }
 
+/**
+ * 为新增 / 更新的内容补上本地时间戳。
+ *
+ * 云端 `updated_at` 由数据库触发器维护，但本地对象拿不到该值，导致：
+ * - 「按更新时间」排序时刚保存的内容不置顶；
+ * - 仪表盘「最近更新」滞后于实际编辑。
+ * 因此本地先盖一个 ISO 时间戳，写入云端后由触发器覆盖为权威值。
+ */
+function stampTimestamps(action: Action): Action {
+  const now = new Date().toISOString()
+  switch (action.type) {
+    case 'post/add':
+      return {
+        ...action,
+        post: { ...action.post, created_at: action.post.created_at ?? now, updated_at: now },
+      }
+    case 'post/update':
+      return { ...action, post: { ...action.post, updated_at: now } }
+    case 'project/add':
+      return {
+        ...action,
+        project: {
+          ...action.project,
+          created_at: action.project.created_at ?? now,
+          updated_at: now,
+        },
+      }
+    case 'project/update':
+      return { ...action, project: { ...action.project, updated_at: now } }
+    default:
+      return action
+  }
+}
+
 /** 把一次本地操作转换为对应的云端写请求 */
 function syncToCloud(action: Action): Promise<void>[] {
   switch (action.type) {
@@ -196,11 +229,14 @@ function reducer(state: State, action: Action): State {
 interface StoreValue {
   posts: Post[]
   projects: Project[]
-  dispatch: Dispatch<Action>
+  /** 派发操作：本地立即生效；返回的 Promise 在云端写入成功时 resolve、失败时 reject */
+  dispatch: (action: Action) => Promise<void>
   /** 是否启用了云端存储 */
   cloudEnabled: boolean
   /** 云端同步状态，可用于界面提示 */
   syncStatus: SyncStatus
+  /** 重新从云端拉取全部数据（失败时抛错，供错误态「重试」使用） */
+  reload: () => Promise<void>
 }
 
 const StoreContext = createContext<StoreValue | null>(null)
@@ -252,23 +288,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // 包装 dispatch：先本地更新（界面即时响应），再异步同步到云端
-  const dispatch = useCallback<Dispatch<Action>>((action) => {
-    dispatchBase(action)
-    if (!cloudEnabled || action.type === 'state/replace') return
-    const tasks = syncToCloud(action)
-    if (tasks.length === 0) return
-    void Promise.all(tasks)
+  // 包装 dispatch：先本地更新（界面即时响应），再同步写入云端。
+  // 返回的 Promise 在云端写入成功时 resolve、失败时 reject，供表单做成功 / 失败提示。
+  const dispatch = useCallback((action: Action): Promise<void> => {
+    const stamped = stampTimestamps(action)
+    dispatchBase(stamped)
+    if (!cloudEnabled || stamped.type === 'state/replace') return Promise.resolve()
+    const tasks = syncToCloud(stamped)
+    if (tasks.length === 0) return Promise.resolve()
+    return Promise.all(tasks)
       .then(() => setSyncStatus('synced'))
       .catch((err) => {
         console.error('[cloud] 写入云端失败：', err)
         setSyncStatus('error')
+        throw err
       })
   }, [])
 
+  // 重新拉取云端数据：用于错误态手动重试
+  const reload = useCallback(async () => {
+    if (!cloudEnabled) return
+    setSyncStatus('loading')
+    try {
+      const remote = await fetchAllData()
+      dispatchBase({ type: 'state/replace', posts: remote.posts, projects: remote.projects })
+      setSyncStatus('synced')
+    } catch (err) {
+      console.error('[cloud] 重新拉取云端数据失败：', err)
+      setSyncStatus('error')
+      throw err
+    }
+  }, [])
+
   const value = useMemo(
-    () => ({ ...state, dispatch, cloudEnabled, syncStatus }),
-    [state, dispatch, syncStatus],
+    () => ({ ...state, dispatch, cloudEnabled, syncStatus, reload }),
+    [state, dispatch, syncStatus, reload],
   )
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }
