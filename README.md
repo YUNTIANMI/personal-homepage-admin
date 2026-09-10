@@ -148,7 +148,6 @@ docs/                           需求与交接文档
 | `docs/ADMIN-PANEL-HANDOFF.md` | 原始技术交接（数据模型、可复用组件、设计系统、全部决策） |
 | `docs/ADMIN-REQUIREMENTS.md` | 后台开发需求（功能编号、验收标准、风险清单） |
 | `docs/REQUIREMENTS.md` | 前台站点原始需求 |
-| `文案修改指南.md` | 站内文案位置索引（源自源项目，部分内容可能已过时） |
 
 ## License
 
