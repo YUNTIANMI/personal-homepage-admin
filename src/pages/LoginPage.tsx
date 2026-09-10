@@ -20,7 +20,7 @@ function mapAuthError(err: unknown): string {
 }
 
 export function LoginPage() {
-  const { signIn, session, loading, cloudEnabled } = useAuth()
+  const { signIn, session, loading, cloudEnabled, sessionExpired } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: string } | null)?.from || '/admin'
@@ -74,6 +74,21 @@ export function LoginPage() {
         </div>
 
         <div className="rounded-2xl border border-line bg-surface p-6 shadow-sm sm:p-8">
+          {cloudEnabled && sessionExpired && (
+            <div
+              role="status"
+              className="mb-5 flex items-start gap-3 rounded-lg border border-warn/40 bg-warn-soft px-4 py-3 text-[0.9375rem] text-warn"
+            >
+              <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold">登录有效期已到</p>
+                <p className="mt-1 leading-relaxed">
+                  为保障账号安全，登录超过 7 天后需要重新验证身份。
+                </p>
+              </div>
+            </div>
+          )}
+
           {!cloudEnabled ? (
             <div className="flex items-start gap-3 rounded-lg border border-warn/40 bg-warn-soft px-4 py-3.5 text-[0.9375rem] text-warn">
               <AlertTriangle size={18} className="mt-0.5 shrink-0" />

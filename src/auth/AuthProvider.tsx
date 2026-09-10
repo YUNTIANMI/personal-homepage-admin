@@ -16,6 +16,62 @@ import {
   signOut as cloudSignOut,
 } from '../lib/cloud'
 
+/**
+ * 登录态最长有效期：超过后强制重新登录，无论期间是否活跃。
+ * 需要调整期限时改这里即可（目前 7 天）。
+ */
+export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
+/** 记录本次登录的起始时间（毫秒时间戳），用于判定是否超过有效期 */
+const SESSION_STARTED_KEY = 'luoji.admin.session.startedAt'
+
+function readStartedAt(): number | null {
+  try {
+    const raw = localStorage.getItem(SESSION_STARTED_KEY)
+    if (!raw) return null
+    const value = Number(raw)
+    return Number.isFinite(value) && value > 0 ? value : null
+  } catch {
+    return null
+  }
+}
+
+function writeStartedAt(ts: number): void {
+  try {
+    localStorage.setItem(SESSION_STARTED_KEY, String(ts))
+  } catch {
+    /* 存储不可用时静默忽略 */
+  }
+}
+
+function clearStartedAt(): void {
+  try {
+    localStorage.removeItem(SESSION_STARTED_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * 取会话的登录起点：
+ * 1. 优先用本地记录（登录时写入，最准确）；
+ * 2. 缺失时回退到 Supabase 的 last_sign_in_at（老会话 / 换了浏览器）；
+ * 3. 都拿不到则视为「现在」开始，避免误判为过期。
+ */
+function resolveStartedAt(session: Session): number {
+  const stored = readStartedAt()
+  if (stored) return stored
+
+  const last = session.user?.last_sign_in_at ? new Date(session.user.last_sign_in_at).getTime() : NaN
+  const started = Number.isFinite(last) ? last : Date.now()
+  writeStartedAt(started)
+  return started
+}
+
+function isExpired(startedAt: number): boolean {
+  return Date.now() - startedAt > SESSION_MAX_AGE_MS
+}
+
 interface AuthValue {
   /** 当前会话，未登录为 null */
   session: Session | null
@@ -25,6 +81,8 @@ interface AuthValue {
   loading: boolean
   /** 是否配置了 Supabase 环境变量 */
   cloudEnabled: boolean
+  /** 是否因超过登录有效期被强制登出（登录页据此提示） */
+  sessionExpired: boolean
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
 }
@@ -34,6 +92,20 @@ const AuthContext = createContext<AuthValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(cloudEnabled)
+  const [sessionExpired, setSessionExpired] = useState(false)
+
+  /** 超过有效期则强制登出 */
+  const forceExpire = useCallback(async () => {
+    try {
+      await cloudSignOut()
+    } catch (err) {
+      console.error('[auth] 会话过期登出失败：', err)
+    } finally {
+      clearStartedAt()
+      setSession(null)
+      setSessionExpired(true)
+    }
+  }, [])
 
   useEffect(() => {
     if (!cloudEnabled) return
@@ -43,7 +115,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void (async () => {
       try {
         const current = await getSession()
-        if (!cancelled) setSession(current)
+        if (cancelled || !current) return
+
+        if (isExpired(resolveStartedAt(current))) {
+          await forceExpire()
+          return
+        }
+        setSession(current)
       } catch (err) {
         console.error('[auth] 读取会话失败：', err)
       } finally {
@@ -51,22 +129,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })()
 
-    // 登录 / 登出 / token 刷新都会触发，保持全局状态同步
-    const unsubscribe = onAuthStateChange((next) => setSession(next))
+    // 登录 / 登出 / token 刷新都会触发，保持全局状态同步并复检有效期
+    const unsubscribe = onAuthStateChange((next) => {
+      if (next) {
+        if (isExpired(resolveStartedAt(next))) {
+          void forceExpire()
+          return
+        }
+        setSession(next)
+        return
+      }
+      setSession(null)
+    })
 
     return () => {
       cancelled = true
       unsubscribe()
     }
-  }, [])
+  }, [forceExpire])
+
+  // 页面长时间挂着时也要在到期后登出（每分钟复检一次）
+  useEffect(() => {
+    if (!session) return
+    const timer = setInterval(() => {
+      const started = readStartedAt()
+      if (started && isExpired(started)) void forceExpire()
+    }, 60_000)
+    return () => clearInterval(timer)
+  }, [session, forceExpire])
 
   const signIn = useCallback(async (email: string, password: string) => {
     const next = await signInWithPassword(email, password)
+    // 记录新的登录起点，并清除「已过期」提示
+    writeStartedAt(Date.now())
+    setSessionExpired(false)
     setSession(next)
   }, [])
 
   const signOut = useCallback(async () => {
     await cloudSignOut()
+    clearStartedAt()
+    setSessionExpired(false)
     setSession(null)
   }, [])
 
@@ -76,10 +179,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: session?.user?.email ?? null,
       loading,
       cloudEnabled,
+      sessionExpired,
       signIn,
       signOut,
     }),
-    [session, loading, signIn, signOut],
+    [session, loading, sessionExpired, signIn, signOut],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
