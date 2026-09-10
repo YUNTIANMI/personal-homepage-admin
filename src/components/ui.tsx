@@ -233,7 +233,7 @@ export function PageHead({
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
         <p className="font-mono text-xs tracking-[0.22em] text-ink-faint uppercase">{kicker}</p>
-        <h1 className="mt-2 text-[clamp(1.75rem,2vw+0.6rem,2.5rem)] font-bold leading-tight tracking-tight text-ink">
+        <h1 className="mt-2 text-[clamp(1.75rem,2vw_+_0.6rem,2.5rem)] font-bold leading-tight tracking-tight text-ink">
           {title}
         </h1>
         {desc && (

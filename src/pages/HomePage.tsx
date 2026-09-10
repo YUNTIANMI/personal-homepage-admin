@@ -88,7 +88,7 @@ export function HomePage({ onNavigate }: { onNavigate: (v: View) => void }) {
             <p className="font-mono text-[13px] tracking-[0.25em] text-ink-faint uppercase">
               {SITE.en} · {SITE.role}
             </p>
-            <h1 className="mt-5 text-[clamp(2.5rem,3.2vw+1rem,4rem)] font-bold leading-[1.1] tracking-tight text-ink">
+            <h1 className="mt-5 text-[clamp(2.5rem,3.2vw_+_1rem,4rem)] font-bold leading-[1.1] tracking-tight text-ink">
               你好，我是<span className="text-brand">{SITE.name}</span>
             </h1>
             <p className="mt-4 font-mono text-lg text-ink-soft">

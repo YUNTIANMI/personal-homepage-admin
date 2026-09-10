@@ -67,7 +67,7 @@ export function PostReader({
               <Chip key={t}>{t}</Chip>
             ))}
           </div>
-          <h1 className="mt-5 text-[clamp(1.75rem,2vw+0.7rem,2.5rem)] font-bold leading-tight tracking-tight text-ink">
+          <h1 className="mt-5 text-[clamp(1.75rem,2vw_+_0.7rem,2.5rem)] font-bold leading-tight tracking-tight text-ink">
             {post.title}
           </h1>
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[13px] text-ink-faint">

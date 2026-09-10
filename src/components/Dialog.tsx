@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from './ui'
 
@@ -20,6 +21,9 @@ export function Dialog({
   children: ReactNode
   ariaLabel?: string
 }) {
+  /** 内容滚动区：打开时复位到顶部，避免自动聚焦把内容推出视口 */
+  const bodyRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -28,6 +32,7 @@ export function Dialog({
     document.addEventListener('keydown', onKey)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    bodyRef.current?.scrollTo({ top: 0 })
     return () => {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = prev
@@ -38,9 +43,15 @@ export function Dialog({
 
   const widthMap = { md: 'max-w-md', lg: 'max-w-2xl', xl: 'max-w-3xl' }
 
-  return (
+  /*
+   * 用 Portal 挂到 document.body：
+   * 避免被祖先元素上的 transform / filter / 动画（如 <main> 的 fade-up）
+   * 创建出的“包含块”劫持，从而保证 fixed 定位始终相对视口，
+   * 弹窗高度与滚动行为在各种窗口尺寸下都正确。
+   */
+  return createPortal(
     <div
-      className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto p-4 sm:p-8"
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-8"
       role="dialog"
       aria-modal="true"
       aria-label={ariaLabel || (typeof title === 'string' ? title : '对话框')}
@@ -49,13 +60,18 @@ export function Dialog({
         className="fixed inset-0 bg-[#0a0f16]/45 backdrop-blur-[2px]"
         onMouseDown={onClose}
       />
+      {/*
+        面板限高在视口内（header 固定，内容区独立滚动）：
+        窗口再矮也能滚到最底部的“保存 / 提交”按钮，不会出现滚不到底的情况。
+        .dialog-panel 在 styles.css 中定义。
+      */}
       <div
         className={cn(
-          'relative my-auto w-full rounded-2xl border border-line bg-surface shadow-2xl shadow-[#0a0f16]/15',
+          'dialog-panel relative flex w-full flex-col rounded-2xl border border-line bg-surface shadow-2xl shadow-[#0a0f16]/15',
           widthMap[size],
         )}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-4">
           <div>
             <h2 className="text-lg font-bold text-ink">{title}</h2>
             {subtitle && <p className="mt-1 text-[0.875rem] text-ink-faint">{subtitle}</p>}
@@ -69,9 +85,15 @@ export function Dialog({
             <X size={18} />
           </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        <div
+          ref={bodyRef}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5"
+        >
+          {children}
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

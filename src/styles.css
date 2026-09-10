@@ -176,6 +176,20 @@
       border-color: var(--brand);
     }
   }
+
+  /*
+   * 弹窗面板限高：面板永远不高于视口，内容超出时由内部滚动区承接。
+   * 这样窗口再矮（半屏 / 1366×768 / 浏览器窗口未最大化）也能滚到底部的提交按钮。
+   * 同时给出 vh 回退与 dvh（移动端地址栏）两套声明。
+   */
+  .dialog-panel {
+    max-height: calc(100vh - 2rem);
+  }
+  @media (min-width: 640px) {
+    .dialog-panel {
+      max-height: calc(100vh - 4rem);
+    }
+  }
 }
 
 /* Markdown 阅读排版：根字号随断点阶梯放大后，正文自然随之放大 */
@@ -407,6 +421,8 @@
     transform: none;
   }
 }
+/* 不用 fill-mode: both —— 否则动画结束后浏览器会保留矩阵形式的 transform，
+   使该元素成为内部 fixed 元素的包含块（会劫持弹窗定位）；结束后回到无 transform 状态。 */
 .fade-up {
-  animation: fade-up 0.22s ease-out both;
+  animation: fade-up 0.22s ease-out;
 }

@@ -61,7 +61,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* Toast 挂载层 */}
       <div
         aria-live="polite"
-        className="pointer-events-none fixed right-4 bottom-4 z-[90] flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-2"
+        className="pointer-events-none fixed right-4 bottom-4 z-[90] flex w-[min(20rem,calc(100vw_-_2rem))] flex-col gap-2"
       >
         {items.map((t) => (
           <div
