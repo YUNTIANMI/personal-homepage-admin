@@ -123,3 +123,37 @@ export function isAuthError(err: unknown): boolean {
     message.includes('row-level security')
   )
 }
+
+/* ---------------- 会话有效期（服务端权威校验） ---------------- */
+
+/** 服务端会话校验结果：有效 / 已失效 / 无法判定（未部署校验函数或网络异常） */
+export type SessionValidity = 'valid' | 'invalid' | 'unavailable'
+
+/**
+ * 调用数据库函数确认当前会话是否仍在有效期内。
+ *
+ * 判定依据是 auth.sessions.created_at（服务端时间），客户端无法伪造，
+ * 因此比本地时间戳更可靠；写策略也同样依赖该函数，做到「客户端怎么改都没用」。
+ *
+ * 若尚未执行 0002 迁移脚本，函数不存在 → 返回 'unavailable'，调用方应回退为本地判断。
+ */
+export async function checkSessionValidity(): Promise<SessionValidity> {
+  if (!cloudEnabled) return 'unavailable'
+
+  const { data, error } = await getClient().rpc('is_admin_session_valid')
+
+  if (error) {
+    const code = (error as { code?: string }).code ?? ''
+    const message = error.message ?? ''
+    const missing =
+      code === 'PGRST202' ||
+      code === '42883' ||
+      message.includes('Could not find the function') ||
+      message.includes('does not exist')
+    if (missing) return 'unavailable'
+    console.warn('[auth] 会话有效性校验失败，暂按本地判断处理：', error)
+    return 'unavailable'
+  }
+
+  return data === true ? 'valid' : 'invalid'
+}
