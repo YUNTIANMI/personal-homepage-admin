@@ -1,37 +1,15 @@
-import { useState } from 'react'
-import { ArrowLeft, CalendarDays, Clock3, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Clock3 } from 'lucide-react'
 import type { Post } from '../types'
-import { ConfirmDialog } from '../components/Dialog'
 import { Chip } from '../components/ui'
 import { MarkdownRenderer } from '../lib/markdown'
-import { useStore } from '../store'
-import { useToast } from '../toast'
 import { fmtDate, readingMinutes } from '../utils'
 
-export function PostReader({
-  post,
-  onBack,
-  onEdit,
-}: {
-  post: Post
-  onBack: () => void
-  onEdit: (p: Post) => void
-}) {
-  const { dispatch } = useStore()
-  const toast = useToast()
-  const [askDelete, setAskDelete] = useState(false)
-
-  const doDelete = () => {
-    dispatch({ type: 'post/delete', ids: [post.id] })
-    toast.success(`文章《${post.title}》已删除`)
-    setAskDelete(false)
-    onBack()
-  }
-
+/** 文章阅读页（展示站点）：只读，不提供编辑 / 删除入口 */
+export function PostReader({ post, onBack }: { post: Post; onBack: () => void }) {
   return (
     <div className="mx-auto w-full max-w-4xl">
       {/* 顶栏 */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center">
         <button
           type="button"
           onClick={onBack}
@@ -39,22 +17,6 @@ export function PostReader({
         >
           <ArrowLeft size={17} /> 返回文章列表
         </button>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => onEdit(post)}
-            className="focus-ring inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[15px] text-ink-soft transition-colors hover:bg-canvas-soft hover:text-ink"
-          >
-            <Pencil size={15} /> 编辑
-          </button>
-          <button
-            type="button"
-            onClick={() => setAskDelete(true)}
-            className="focus-ring inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[15px] text-danger transition-colors hover:bg-danger-soft"
-          >
-            <Trash2 size={15} /> 删除
-          </button>
-        </div>
       </div>
 
       {/* 文章主体 */}
@@ -62,7 +24,6 @@ export function PostReader({
         <header>
           <div className="flex flex-wrap items-center gap-2">
             {post.category && <Chip tone="brand">{post.category}</Chip>}
-            {post.isSample && <Chip tone="warn">示例 · 可删除</Chip>}
             {post.tags.map((t) => (
               <Chip key={t}>{t}</Chip>
             ))}
@@ -92,14 +53,6 @@ export function PostReader({
           <ArrowLeft size={16} /> 返回列表
         </button>
       </div>
-
-      <ConfirmDialog
-        open={askDelete}
-        title="删除文章"
-        message={`将删除文章《${post.title}》，删除后不可恢复，确定继续吗？`}
-        onCancel={() => setAskDelete(false)}
-        onConfirm={doDelete}
-      />
     </div>
   )
 }

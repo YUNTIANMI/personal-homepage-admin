@@ -36,3 +36,6 @@ export interface Project {
   /** 云端最近更新时间（阶段一新增列，由数据库触发器维护） */
   updated_at?: string
 }
+
+/** 对外展示站点的视图（展示部分沿用页内切换，不改地址栏） */
+export type View = 'home' | 'blog' | 'read' | 'projects' | 'about'
