@@ -1,9 +1,9 @@
 {
-  "name": "luoji-home",
+  "name": "luoji-admin",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "罗辑个人主页 —— 软件工程方向个人博客与作品集",
+  "description": "罗辑个人主页 · 后台管理系统（基于 luoji-home 复制开发，共用同一 Supabase 数据库）",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
