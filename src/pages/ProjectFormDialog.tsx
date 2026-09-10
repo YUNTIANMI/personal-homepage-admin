@@ -48,6 +48,7 @@ export function ProjectFormDialog({
     linkErrors: Record<string, string>
     linkContainer?: string
   }>({ linkErrors: {} })
+  const [saving, setSaving] = useState(false)
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft((d) => ({ ...d, [key]: value }))
@@ -85,24 +86,35 @@ export function ProjectFormDialog({
     return !next.name && !next.tagline && Object.keys(linkErrors).length === 0 && validRows > 0
   }
 
-  const save = () => {
-    if (!validate()) return
-    const payload = {
+  const save = async () => {
+    if (!validate() || saving) return
+
+    const payload: Project = {
       name: draft.name.trim(),
       tagline: draft.tagline.trim(),
       tech: draft.tech,
       links: draft.links
         .filter((l) => l.label.trim() && l.href.trim())
         .map((l) => ({ id: l.id, label: l.label.trim(), href: l.href.trim() })),
+      id: isEdit && project ? project.id : uid(),
     }
-    if (isEdit && project) {
-      dispatch({ type: 'project/update', project: { ...payload, id: project.id } })
-      toast.success(`项目「${payload.name}」已保存，列表已刷新`)
-    } else {
-      dispatch({ type: 'project/add', project: { ...payload, id: uid() } })
-      toast.success(`项目「${payload.name}」已添加，列表已刷新`)
+
+    setSaving(true)
+    try {
+      if (isEdit) {
+        await dispatch({ type: 'project/update', project: payload })
+        toast.success(`项目「${payload.name}」已保存`)
+      } else {
+        await dispatch({ type: 'project/add', project: payload })
+        toast.success(`项目「${payload.name}」已添加`)
+      }
+      onClose()
+    } catch (err) {
+      console.error('[project] 保存失败：', err)
+      toast.danger('保存失败：云端写入被拒绝，请确认登录状态与数据库权限')
+    } finally {
+      setSaving(false)
     }
-    onClose()
   }
 
   return (
@@ -156,11 +168,11 @@ export function ProjectFormDialog({
         </Field>
 
         <div className="flex justify-end gap-2 border-t border-line pt-4">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
             取消
           </Button>
-          <Button variant="primary" onClick={save}>
-            {isEdit ? '保存修改' : '添加项目'}
+          <Button variant="primary" onClick={save} disabled={saving}>
+            {saving ? '保存中…' : isEdit ? '保存修改' : '添加项目'}
           </Button>
         </div>
       </div>
