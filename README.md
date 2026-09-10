@@ -30,7 +30,7 @@
 
 ```bash
 npm install     # 安装依赖
-npm run dev     # 开发服务器 → http://localhost:5173
+npm run dev     # 开发服务器 → http://localhost:5174（与前台 5173 区分）
 
 npm run build     # 类型检查 + 生产构建（输出 dist/）
 npm run preview   # 本地预览构建产物
