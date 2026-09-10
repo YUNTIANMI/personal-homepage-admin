@@ -263,19 +263,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const remote = await fetchAllData()
         if (cancelled) return
 
-        // 首次启用云端（云端为空而本地有数据）→ 把本地数据迁移上传，避免丢失
-        if (remote.posts.length === 0 && remote.projects.length === 0) {
-          const local = readLocalCache()
-          if (local && (local.posts.length > 0 || local.projects.length > 0)) {
-            await Promise.all([
-              ...local.posts.map((p) => upsertDoc(COLLECTIONS.posts, p)),
-              ...local.projects.map((j) => upsertDoc(COLLECTIONS.projects, j)),
-            ])
-            if (!cancelled) setSyncStatus('synced')
-            return
-          }
-        }
-
+        // 注意：这里不再做「本地数据迁移上传」。
+        // 展示站点对所有访客开放，任何隐式写入都会被 RLS 拒绝并污染同步状态；
+        // 内容写入只允许在后台（登录态）显式发生。
         dispatchBase({ type: 'state/replace', posts: remote.posts, projects: remote.projects })
         setSyncStatus('synced')
       } catch (err) {
