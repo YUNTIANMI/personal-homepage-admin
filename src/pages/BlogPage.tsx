@@ -81,7 +81,7 @@ export function BlogPage({
 
   return (
     <div className="space-y-6">
-      <PageHead kicker="// Blog · Markdown Powered" title="博客文章" />
+      <PageHead kicker="Blog · Markdown Powered" title="博客文章" />
 
       {/* 工具条 */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

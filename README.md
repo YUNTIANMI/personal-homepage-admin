@@ -24,7 +24,7 @@
 | 样式 | Tailwind CSS v4（`@tailwindcss/vite`）+ 设计 Token（CSS 变量驱动主题） |
 | Markdown | `react-markdown` + `remark-gfm` + `rehype-highlight` |
 | 图标 | `lucide-react` |
-| 状态 | React Hooks（`useReducer` + Context，内存仓库） |
+| 状态 | React Hooks（`useReducer` + Context）+ localStorage 本地持久化 |
 
 ## 目录结构
 
@@ -38,7 +38,7 @@ luoji-home/
 │   ├── App.tsx              # 布局（Header / Main / Footer）与页面路由
 │   ├── styles.css           # 设计 Token、主题、Markdown 排版、语法高亮
 │   ├── types.ts             # 领域类型（Post / Project / View）
-│   ├── store.tsx            # 内存仓库（文章 / 项目 增删改查）
+│   ├── store.tsx            # 数据仓库（localStorage 持久化 + 文章 / 项目 增删改查）
 │   ├── toast.tsx            # 轻提示
 │   ├── utils.ts             # 日期格式化 / 阅读时长等工具
 │   ├── lib/
@@ -98,14 +98,19 @@ npm run typecheck
 
 ## 数据如何管理
 
-当前实现为**纯前端演示架构**：文章与项目保存在运行期「内存仓库」中，刷新页面即恢复初始示例数据。
+文章与项目保存在浏览器 **localStorage**（键名 `luoji.store.v1`）中，**新增 / 编辑 / 删除后刷新或关闭浏览器都不会丢失**。
 
+- **首次访问**：本地无数据时载入 1 条内置示例文章（标注「示例 · 可删除」），删除后**不会再自动出现**
 - **新增文章**：进入「博客」页 → 右上角「新增文章」→ 填写标题 / 分类 / 标签 / 摘要 / Markdown 正文 → 发布
 - **编辑 / 删除**：文章行内操作图标，支持单篇删除与复选框批量删除
 - **新增项目**：进入「项目」页 → 「新增项目」→ 填写名称 / 简介 / 技术标签，并至少添加一条外链（如 GitHub）
 - **个人资料**：站点名称、一句话介绍、GitHub / 邮箱、技能栈在 `src/lib/site.ts` 中配置
 
-> 说明：仓库内置 1 条示例文章（标注「示例 · 可删除」），可直接删除后开始写作。
+> 数据存储机制在 `src/store.tsx`：`loadState()` 负责读取（无数据时注入示例），`StoreProvider` 在每次数据变化时写回 localStorage。
+>
+> 想恢复出厂示例数据：浏览器 DevTools → Application → Local Storage → 删除 `luoji.store.v1`，刷新即可。
+>
+> 注意：本方案为**单浏览器本地存储**，换设备 / 换浏览器 / 清空浏览器数据都会丢失，也不会多端同步。如需多设备同步，可把 `src/store.tsx` 的读写替换为云端数据库（CloudBase / Supabase 等）。
 
 ## 个性化配置
 

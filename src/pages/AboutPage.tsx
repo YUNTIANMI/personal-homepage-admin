@@ -1,12 +1,53 @@
-import { Mail, UserRound } from 'lucide-react'
+import { useState } from 'react'
+import { Check, Copy, Mail, UserRound } from 'lucide-react'
 import { Chip, PageHead } from '../components/ui'
 import { GithubIcon } from '../components/icons'
 import { SITE } from '../lib/site'
+import { useToast } from '../toast'
 
 export function AboutPage() {
+  const toast = useToast()
+  const [copied, setCopied] = useState(false)
+
+  /** 旧浏览器 / 非安全上下文的复制兜底方案 */
+  const legacyCopy = (text: string) => {
+    try {
+      const el = document.createElement('textarea')
+      el.value = text
+      el.setAttribute('readonly', '')
+      el.style.position = 'fixed'
+      el.style.top = '-1000px'
+      el.style.opacity = '0'
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+    } catch {
+      /* 复制失败时静默忽略 */
+    }
+  }
+
+  /**
+   * 复制邮箱到剪贴板：
+   * 优先 Clipboard API，失败 / 不支持时回退 execCommand；
+   * 不 await 剪贴板结果，点击后立即给出反馈（避免个别环境权限挂起导致无响应）。
+   */
+  const copyEmail = () => {
+    const text = SITE.email
+    if (!text) return
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).catch(() => legacyCopy(text))
+    } else {
+      legacyCopy(text)
+    }
+    setCopied(true)
+    toast.success('邮箱已复制到剪贴板')
+    window.setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
     <div className="space-y-6">
-      <PageHead kicker="// About · LUOJI" title="关于我" />
+      <PageHead kicker="About · LUOJI" title="关于我" />
 
       <div className="grid items-stretch gap-6 lg:grid-cols-2">
         {/* 自我介绍：通栏 */}
@@ -27,7 +68,6 @@ export function AboutPage() {
         {/* 技能栈 */}
         <section className="flex flex-col rounded-2xl border border-line bg-surface p-7 sm:p-9">
           <div className="flex items-center gap-2.5">
-            <span className="font-mono text-sm text-brand">$</span>
             <h2 className="text-xl font-bold text-ink">技能栈</h2>
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
@@ -57,12 +97,24 @@ export function AboutPage() {
               </a>
             )}
             {SITE.email && (
-              <a
-                href={`mailto:${SITE.email}`}
-                className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line-strong px-5 py-2.5 text-[15px] font-medium text-ink transition-colors hover:border-brand hover:text-brand"
+              <button
+                type="button"
+                onClick={copyEmail}
+                title="点击复制邮箱"
+                aria-label={`复制邮箱 ${SITE.email}`}
+                className="focus-ring group inline-flex items-center gap-2 rounded-lg border border-line-strong px-5 py-2.5 text-[15px] font-medium text-ink transition-colors hover:border-brand hover:text-brand"
               >
                 <Mail size={17} /> {SITE.email}
-              </a>
+                {copied ? (
+                  <Check size={15} className="text-ok" aria-hidden="true" />
+                ) : (
+                  <Copy
+                    size={15}
+                    aria-hidden="true"
+                    className="opacity-0 transition-opacity duration-150 group-hover:opacity-70 group-focus-visible:opacity-70"
+                  />
+                )}
+              </button>
             )}
           </div>
         </section>

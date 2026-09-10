@@ -1,7 +1,7 @@
 import { Moon, Sun } from 'lucide-react'
 import type { View } from '../types'
 import { SITE } from '../lib/site'
-import { BrandLogo, GithubIcon } from './icons'
+import { BrandLogo } from './icons'
 import { cn } from './ui'
 
 const NAV: Array<{ key: View; label: string }> = [
@@ -66,20 +66,8 @@ export function Header({
             })}
           </nav>
 
-          {/* 操作区 */}
+          {/* 操作区：仅保留明 / 暗主题切换 */}
           <div className="flex items-center gap-1">
-            {SITE.github && (
-              <a
-                href={SITE.github}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="GitHub"
-                aria-label="GitHub 主页（新标签页打开）"
-                className="focus-ring grid size-10 place-items-center rounded-lg text-ink-soft transition-colors hover:bg-canvas-soft hover:text-ink"
-              >
-                <GithubIcon size={19} />
-              </a>
-            )}
             <button
               type="button"
               onClick={onToggleTheme}

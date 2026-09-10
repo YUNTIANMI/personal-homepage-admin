@@ -56,7 +56,7 @@ export function ProjectsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHead kicker="// Projects · Open Source" title="软件项目" />
+      <PageHead kicker="Projects · Open Source" title="软件项目" />
 
       {/* 工具条 */}
       <div className="flex flex-wrap items-center gap-2.5">

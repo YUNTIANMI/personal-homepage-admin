@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useReducer,
   type Dispatch,
@@ -10,9 +11,11 @@ import type { Post, Project } from './types'
 import { todayISO } from './utils'
 
 /**
- * 内存数组临时仓库：
- * 数据仅保存在运行期内存中，新增 / 编辑 / 删除直接操作数组，刷新页面即回到初始状态。
- * 这是本需求刻意采用的“前端自闭环”方案，无需后端即可完整演示整套增删改查流程。
+ * 本地持久化仓库（浏览器 localStorage）：
+ * - 首次访问（本地无数据）时载入内置示例文章；
+ * - 之后所有新增 / 编辑 / 删除都会写回本地存储，刷新页面数据不会丢失；
+ * - 删除示例文章后不会再“复活”，只有清空浏览器存储才会重新载入示例。
+ * - 如需多设备同步，可将 loadState / 写回替换为云端数据库（CloudBase / Supabase 等）。
  */
 
 /** 内置示例文章的 id（示例仅 1 条，标注「示例 · 可删除」） */
@@ -94,7 +97,24 @@ export type Action =
   | { type: 'project/update'; project: Project }
   | { type: 'project/delete'; ids: string[] }
 
-const initialPosts: Post[] = buildSeedPosts()
+/** 本地存储键（带版本号，便于后续数据结构升级时迁移） */
+const STORAGE_KEY = 'luoji.store.v1'
+
+/** 读取本地数据；无数据 / 解析失败时回退到内置示例 */
+function loadState(): State {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<State>
+      if (Array.isArray(parsed.posts) && Array.isArray(parsed.projects)) {
+        return { posts: parsed.posts, projects: parsed.projects }
+      }
+    }
+  } catch {
+    /* 数据损坏或浏览器禁用存储：使用示例数据兜底 */
+  }
+  return { posts: buildSeedPosts(), projects: [] }
+}
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -136,10 +156,17 @@ interface StoreValue {
 const StoreContext = createContext<StoreValue | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, () => ({
-    posts: initialPosts,
-    projects: [],
-  }))
+  const [state, dispatch] = useReducer(reducer, undefined, loadState)
+
+  // 数据变化即写回本地存储，刷新 / 关闭浏览器后仍然保留
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    } catch {
+      /* 存储不可用（隐私模式 / 超出配额）时静默忽略 */
+    }
+  }, [state])
+
   const value = useMemo(() => ({ ...state, dispatch }), [state])
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }
