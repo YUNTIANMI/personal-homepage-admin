@@ -44,6 +44,7 @@ export function PostFormDialog({
   const [draft, setDraft] = useState<PostDraft>(post ? pick(post) : emptyDraft())
   const [tab, setTab] = useState<'write' | 'preview'>('write')
   const [errors, setErrors] = useState<Partial<Record<keyof PostDraft, string>>>({})
+  const [saving, setSaving] = useState(false)
 
   function pick(p: Post): PostDraft {
     return {
@@ -75,34 +76,33 @@ export function PostFormDialog({
     return Object.keys(next).length === 0
   }
 
-  const save = () => {
-    if (!validate()) return
-    if (isEdit && post) {
-      dispatch({
-        type: 'post/update',
-        post: {
-          ...draft,
-          id: post.id,
-          title: draft.title.trim(),
-          category: draft.category.trim(),
-          description: draft.description.trim(),
-        },
-      })
-      toast.success(`文章《${draft.title.trim()}》已保存，列表已刷新`)
-    } else {
-      dispatch({
-        type: 'post/add',
-        post: {
-          ...draft,
-          id: uid(),
-          title: draft.title.trim(),
-          category: draft.category.trim(),
-          description: draft.description.trim(),
-        },
-      })
-      toast.success('文章已发布，列表已刷新')
+  const save = async () => {
+    if (!validate() || saving) return
+
+    const payload: Post = {
+      ...draft,
+      id: isEdit && post ? post.id : uid(),
+      title: draft.title.trim(),
+      category: draft.category.trim(),
+      description: draft.description.trim(),
     }
-    onClose()
+
+    setSaving(true)
+    try {
+      if (isEdit) {
+        await dispatch({ type: 'post/update', post: payload })
+        toast.success(`文章《${payload.title}》已保存`)
+      } else {
+        await dispatch({ type: 'post/add', post: payload })
+        toast.success('文章已发布')
+      }
+      onClose()
+    } catch (err) {
+      console.error('[post] 保存失败：', err)
+      toast.danger('保存失败：云端写入被拒绝，请确认登录状态与数据库权限')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -218,11 +218,11 @@ export function PostFormDialog({
         </Field>
 
         <div className="flex justify-end gap-2 border-t border-line pt-4">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
             取消
           </Button>
-          <Button variant="primary" onClick={save}>
-            {isEdit ? '保存修改' : '发布文章'}
+          <Button variant="primary" onClick={save} disabled={saving}>
+            {saving ? '保存中…' : isEdit ? '保存修改' : '发布文章'}
           </Button>
         </div>
       </div>
