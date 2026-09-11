@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.2.0",
   "type": "module",
-  "description": "罗辑个人主页 · 后台管理系统（基于 luoji-home 复制开发，共用同一 Supabase 数据库）",
+  "description": "罗辑个人主页 · 展示站点 + 后台管理（前端 React + 后端 Spring Boot）",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -11,7 +11,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.116.0",
     "lucide-react": "^1.43.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
