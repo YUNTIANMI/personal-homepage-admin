@@ -4,43 +4,22 @@ import { Chip, PageHead } from '../components/ui'
 import { GithubIcon } from '../components/icons'
 import { useStore } from '../store'
 import { useToast } from '../toast'
+import { copyToClipboard } from '../utils'
 
 export function AboutPage() {
   const { site } = useStore()
   const toast = useToast()
   const [copied, setCopied] = useState(false)
 
-  /** 旧浏览器 / 非安全上下文的复制兜底方案 */
-  const legacyCopy = (text: string) => {
-    try {
-      const el = document.createElement('textarea')
-      el.value = text
-      el.setAttribute('readonly', '')
-      el.style.position = 'fixed'
-      el.style.top = '-1000px'
-      el.style.opacity = '0'
-      document.body.appendChild(el)
-      el.select()
-      document.execCommand('copy')
-      document.body.removeChild(el)
-    } catch {
-      /* 复制失败时静默忽略 */
-    }
-  }
-
   /**
    * 复制邮箱到剪贴板：
-   * 优先 Clipboard API，失败 / 不支持时回退 execCommand；
-   * 不 await 剪贴板结果，点击后立即给出反馈（避免个别环境权限挂起导致无响应）。
+   * 统一走 copyToClipboard（内部已处理非安全上下文的回退）；
+   * 不 await 结果，点击后立即给出反馈（避免个别环境权限挂起导致无响应）。
    */
   const copyEmail = () => {
     const text = site.email
     if (!text) return
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(text).catch(() => legacyCopy(text))
-    } else {
-      legacyCopy(text)
-    }
+    void copyToClipboard(text)
     setCopied(true)
     toast.success('邮箱已复制到剪贴板')
     window.setTimeout(() => setCopied(false), 2000)

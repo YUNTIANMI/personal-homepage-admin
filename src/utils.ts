@@ -76,3 +76,37 @@ export function excerptOf(
   const text = markdownToPlainText(source.content ?? '')
   return text.length > max ? `${text.slice(0, max)}…` : text
 }
+
+/**
+ * 复制文本到剪贴板，返回是否成功。
+ *
+ * Clipboard API 只在「安全上下文」（HTTPS 或 localhost）下存在，
+ * 通过局域网 IP / 非 https 域名访问时 `navigator.clipboard` 为 undefined，
+ * 因此这里在不可用时回退到隐藏 textarea + `execCommand('copy')`。
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  if (typeof window !== 'undefined' && window.isSecureContext && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      /* 权限被拒等情况继续走下面的回退方案 */
+    }
+  }
+
+  try {
+    const el = document.createElement('textarea')
+    el.value = text
+    el.setAttribute('readonly', '')
+    el.style.position = 'fixed'
+    el.style.top = '-1000px'
+    el.style.opacity = '0'
+    document.body.appendChild(el)
+    el.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(el)
+    return ok
+  } catch {
+    return false
+  }
+}

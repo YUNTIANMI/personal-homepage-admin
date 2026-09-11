@@ -14,6 +14,7 @@ import { ConfirmDialog } from '../../components/Dialog'
 import { Button, EmptyState, IconBtn, PageHead } from '../../components/ui'
 import { fmtBytes, listAssets, removeAsset, uploadImage, type AssetItem } from '../../lib/storage'
 import { useToast } from '../../toast'
+import { copyToClipboard } from '../../utils'
 
 /** 媒体库：上传 / 浏览 / 复制链接 / 删除图片（存 Supabase Storage） */
 export function AssetsPage() {
@@ -62,14 +63,13 @@ export function AssetsPage() {
   }
 
   const copyUrl = async (item: AssetItem) => {
-    try {
-      await navigator.clipboard.writeText(item.url)
-      setCopied(item.path)
-      toast.success('图片链接已复制')
-      window.setTimeout(() => setCopied(''), 1800)
-    } catch {
+    if (!(await copyToClipboard(item.url))) {
       toast.danger('复制失败，请手动选择链接')
+      return
     }
+    setCopied(item.path)
+    toast.success('图片链接已复制')
+    window.setTimeout(() => setCopied(''), 1800)
   }
 
   const doDelete = async () => {
