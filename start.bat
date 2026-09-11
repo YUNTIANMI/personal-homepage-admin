@@ -8,8 +8,8 @@ echo   罗辑个人主页 · 一键启动
 echo ================================================
 echo.
 
-REM ---- [1/4] 启动 MySQL + Redis ----
-echo [1/4] 启动 MySQL + Redis ...
+REM ============ [1/5] 启动 MySQL + Redis ============
+echo [1/5] 启动 MySQL + Redis ...
 docker compose -f backend\docker-compose.yml up -d mysql redis
 if errorlevel 1 (
     echo.
@@ -19,8 +19,20 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM ---- [2/4] 等待 MySQL 健康 ----
-echo [2/4] 等待 MySQL 就绪 ...
+REM ============ [2/5] 端口映射自愈 ============
+echo [2/5] 检查 MySQL 端口映射 ...
+:check_port
+docker port luoji-mysql 3306 2>nul | findstr /i "3307" >nul
+if not errorlevel 1 goto port_ok
+echo       端口映射缺失，重建容器 ...
+docker rm -f luoji-mysql luoji-redis >nul 2>&1
+docker compose -f backend\docker-compose.yml up -d mysql redis >nul 2>&1
+timeout /t 5 >nul
+goto check_port
+:port_ok
+
+REM ============ [3/5] 等待 MySQL 健康 ============
+echo [3/5] 等待 MySQL 就绪 ...
 set /a WAIT=0
 :wait_mysql
 docker inspect --format "{{.State.Health.Status}}" luoji-mysql 2>nul | findstr /i "healthy" >nul
@@ -33,7 +45,7 @@ goto wait_mysql
 echo MySQL 就绪。
 echo.
 
-REM ---- 探测 Maven ----
+REM ============ 探测 Maven ============
 set "MVN="
 where mvn >nul 2>nul && set "MVN=mvn"
 if not defined MVN (
@@ -49,26 +61,36 @@ if not defined MVN (
     exit /b 1
 )
 
-REM ---- [3/4] 启动后端 ----
-echo [3/4] 启动后端（新窗口）...
-start "luoji-backend" /D "%~dp0backend" cmd /k "set DB_PORT=3307&& set DB_USER=luoji&& set DB_PASSWORD=luoji123456&& set DB_NAME=luoji_blog&& %MVN% spring-boot:run"
+REM ============ [4/5] 启动后端（已运行则跳过）============
+echo [4/5] 启动后端 ...
+netstat -ano | findstr ":8080 " | findstr "LISTENING" >nul 2>&1
+if not errorlevel 1 (
+    echo       后端已在运行，跳过。
+) else (
+    start "luoji-backend" /D "%~dp0backend" cmd /k "set DB_PORT=3307&& set DB_USER=luoji&& set DB_PASSWORD=luoji123456&& set DB_NAME=luoji_blog&& %MVN% spring-boot:run"
+)
 
-REM ---- [4/4] 启动前端 ----
+REM ============ [5/5] 启动前端（已运行则跳过）============
 if not exist "node_modules" (
     echo 首次运行，安装前端依赖 ...
     call npm install
 )
-echo [4/4] 启动前端（新窗口）...
-start "luoji-frontend" /D "%~dp0" cmd /k "npm run dev"
+echo [5/5] 启动前端 ...
+netstat -ano | findstr ":5174 " | findstr "LISTENING" >nul 2>&1
+if not errorlevel 1 (
+    echo       前端已在运行，跳过。
+) else (
+    start "luoji-frontend" /D "%~dp0" cmd /k "npm run dev"
+)
 
 echo.
-echo 等待服务启动，稍后自动打开浏览器 ...
-timeout /t 10 >nul
+echo 稍后自动打开浏览器 ...
+timeout /t 6 >nul
 start http://localhost:5174/login
 
 echo.
 echo ================================================
-echo   启动完成！
+echo   完成！
 echo.
 echo   前端站点:  http://localhost:5174
 echo   后台登录:  http://localhost:5174/login
