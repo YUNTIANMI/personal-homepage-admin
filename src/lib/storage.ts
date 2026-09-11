@@ -1,33 +1,41 @@
 /**
- * Supabase Storage 数据层（assets bucket）
+ * 媒体数据层。
  *
- * - 读取公开：展示站点直接引用公开 URL，无需鉴权；
- * - 上传 / 删除仅限【已登录且会话未过期】的管理员，由数据库侧 Storage 策略强制。
+ * 图片上传 / 列举 / 删除均走后端 /api/media/*，文件由后端落到本地磁盘（StorageService 抽象），
+ * 前端只拿到公开 URL 与元数据。读取公开、上传与删除需登录，由后端 Security 与 Service 双重校验。
  */
-import { uid } from '../utils'
-import { getClient } from './cloud'
+import { getAccessToken, request, type ApiError } from './api'
 
-const ASSETS_BUCKET = 'assets'
+const API_BASE = String(import.meta.env.VITE_API_BASE ?? 'http://localhost:8080/api').replace(/\/+$/, '')
 
-/** 单文件上限（与 bucket 设置保持一致） */
+/** 单文件上限（与后端 MediaServiceImpl 保持一致） */
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
-/** 允许的图片类型（与 bucket 的 allowed_mime_types 保持一致） */
+/** 允许的图片类型（与后端保持一致） */
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
 
 export interface AssetItem {
+  /** 后端自增主键（删除用） */
+  id: number
+  /** 原始文件名 */
   name: string
-  /** 对象路径（删除用） */
+  /** 存储相对路径 yyyy/MM/uuid.ext */
   path: string
   /** 公开访问地址（引用用） */
   url: string
   size: number
-  updatedAt: string | null
+  createdAt: string
 }
 
-/** 由对象路径取公开 URL */
-function publicUrl(path: string): string {
-  return getClient().storage.from(ASSETS_BUCKET).getPublicUrl(path).data.publicUrl
+/** 后端 MediaVO 的原始形态 */
+interface MediaVO {
+  id: number
+  filename: string
+  path: string
+  url: string
+  size: number
+  mime: string
+  createdAt: string
 }
 
 /** 上传前校验；不通过时返回原因文案 */
@@ -39,74 +47,55 @@ function validateImage(file: File): string | null {
   return null
 }
 
-function extOf(file: File): string {
-  const fromName = file.name.includes('.') ? (file.name.split('.').pop() ?? '').toLowerCase() : ''
-  if (/^[a-z0-9]{2,5}$/.test(fromName)) return fromName
-  const byType: Record<string, string> = {
-    'image/png': 'png',
-    'image/jpeg': 'jpg',
-    'image/webp': 'webp',
-    'image/gif': 'gif',
+function toAssetItem(v: MediaVO): AssetItem {
+  return {
+    id: v.id,
+    name: v.filename,
+    path: v.path,
+    url: v.url,
+    size: Number(v.size ?? 0),
+    createdAt: v.createdAt,
   }
-  return byType[file.type] ?? 'png'
 }
 
-/** 上传图片，返回对象路径与公开 URL */
+/** 上传图片，返回对象元数据 */
 export async function uploadImage(file: File): Promise<{ path: string; url: string }> {
   const invalid = validateImage(file)
   if (invalid) throw new Error(invalid)
 
-  const now = new Date()
-  const dir = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`
-  // 用 uid() 而非直接调用 crypto.randomUUID：后者只在安全上下文（HTTPS / localhost）可用，
-  // 通过局域网 IP 等地址访问时会抛 “crypto.randomUUID is not a function”。
-  const path = `${dir}/${uid()}.${extOf(file)}`
+  const form = new FormData()
+  form.append('file', file)
 
-  const { error } = await getClient()
-    .storage.from(ASSETS_BUCKET)
-    .upload(path, file, { contentType: file.type, cacheControl: '31536000', upsert: false })
-  if (error) throw error
+  const token = getAccessToken()
 
-  return { path, url: publicUrl(path) }
-}
-
-/** 列出全部图片（按 年/月 目录递归遍历，最多 3 层） */
-export async function listAssets(): Promise<AssetItem[]> {
-  const bucket = getClient().storage.from(ASSETS_BUCKET)
-  const out: AssetItem[] = []
-
-  const walk = async (prefix: string, depth: number): Promise<void> => {
-    const { data, error } = await bucket.list(prefix, {
-      limit: 1000,
-      sortBy: { column: 'created_at', order: 'desc' },
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}/media/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
     })
-    if (error) throw error
-
-    for (const entry of data ?? []) {
-      const path = prefix ? `${prefix}/${entry.name}` : entry.name
-      const isFolder = !entry.id && !entry.metadata
-      if (isFolder) {
-        if (depth < 3) await walk(path, depth + 1)
-        continue
-      }
-      out.push({
-        name: entry.name,
-        path,
-        url: publicUrl(path),
-        size: Number((entry.metadata as { size?: number } | null)?.size ?? 0),
-        updatedAt: entry.updated_at ?? null,
-      })
-    }
+  } catch {
+    throw new Error('网络连接失败，请确认后端服务已启动')
   }
 
-  await walk('', 0)
-  return out
+  const body = (await res.json().catch(() => null)) as { code: number; message: string; data: MediaVO } | null
+  if (!res.ok || !body || body.code !== 0) {
+    const err = new Error(body?.message ?? '上传失败') as ApiError
+    throw err
+  }
+  return { path: body.data.path, url: body.data.url }
 }
 
-/** 删除图片 */
-export async function removeAsset(path: string): Promise<void> {
-  const { error } = await getClient().storage.from(ASSETS_BUCKET).remove([path])
-  if (error) throw error
+/** 列出全部图片（服务端分页，单页取上限 200，个人站点够用） */
+export async function listAssets(): Promise<AssetItem[]> {
+  const page = await request<{ total: number; records: MediaVO[] }>('/media?page=1&size=200')
+  return (page.records ?? []).map(toAssetItem)
+}
+
+/** 删除图片（按后端主键 id） */
+export async function removeAsset(id: number): Promise<void> {
+  await request<void>(`/media/${id}`, { method: 'DELETE' })
 }
 
 /** 人类可读的文件体积 */
