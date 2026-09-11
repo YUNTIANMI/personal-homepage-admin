@@ -11,8 +11,7 @@ import {
 import { SyncErrorBanner } from '../../components/AdminLayout'
 import { Button, Field, Input, PageHead } from '../../components/ui'
 import { useAuth } from '../../auth/AuthProvider'
-import { apiChangePassword, createPost, createProject, saveSiteConfig } from '../../lib/api'
-import { mergeSite } from '../../lib/site'
+import { apiChangePassword, exportData, importData } from '../../lib/api'
 import { useStore } from '../../store'
 import { useToast } from '../../toast'
 import type { Post, Project, SiteProfile } from '../../types'
@@ -67,7 +66,7 @@ function parsePayload(text: string): ImportPayload {
 
 /** 数据导入导出 + 管理员密码修改 */
 export function SettingsPage() {
-  const { posts, projects, site, reload } = useStore()
+  const { posts, projects, reload } = useStore()
   const { username } = useAuth()
   const toast = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -85,24 +84,24 @@ export function SettingsPage() {
 
   /* ---------------- 导出 ---------------- */
 
-  const exportJson = () => {
-    const data: ImportPayload = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      posts,
-      projects,
-      siteProfile: site,
+  const exportJson = async () => {
+    try {
+      // 走后端导出（汇总文章/项目/站点配置为统一载荷）
+      const data = await exportData()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `luoji-backup-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success(`已导出 ${posts.length} 篇文章 / ${projects.length} 个项目`)
+    } catch (err) {
+      console.error('[export] 导出失败：', err)
+      toast.danger(err instanceof Error ? err.message : '导出失败')
     }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `luoji-backup-${new Date().toISOString().slice(0, 10)}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    toast.success(`已导出 ${posts.length} 篇文章 / ${projects.length} 个项目`)
   }
 
   /* ---------------- 导入 ---------------- */
@@ -144,23 +143,18 @@ export function SettingsPage() {
     if (!payload || importing) return
     setImporting(true)
     try {
-      // 阶段三后端尚未提供 /api/import 事务接口，暂时前端逐条新增；
-      // 阶段五后端实现导入导出后，这里改为一次性调用 /api/import（差异预览 + 事务写入）。
-      if (payload.posts?.length) {
-        for (const p of payload.posts) await createPost({ ...p, id: 0 })
-      }
-      if (payload.projects?.length) {
-        for (const p of payload.projects) await createProject({ ...p, id: 0 })
-      }
-      if (payload.siteProfile) await saveSiteConfig(mergeSite(payload.siteProfile))
+      // 走后端 /api/import：单事务内批量写入，任一失败整体回滚
+      const result = await importData(payload)
       await reload()
-      toast.success('导入完成，数据已更新')
+      toast.success(
+        `导入完成：文章 +${result.postsAdded} · 项目 +${result.projectsAdded}${result.siteUpdated ? ' · 站点配置已更新' : ''}`,
+      )
       setPayload(null)
       setDiff(null)
       setFilename('')
     } catch (err) {
       console.error('[import] 导入失败：', err)
-      toast.danger('导入失败：请确认登录状态与数据库权限')
+      toast.danger(err instanceof Error ? err.message : '导入失败，数据已回滚')
     } finally {
       setImporting(false)
     }
@@ -228,7 +222,7 @@ export function SettingsPage() {
             导出为 JSON 文件（包含文章、项目与站点配置），可用于备份或迁移。
           </p>
           <div className="mt-5">
-            <Button variant="primary" size="sm" onClick={exportJson}>
+            <Button variant="primary" size="sm" onClick={() => void exportJson()}>
               <Download size={15} /> 导出 JSON
             </Button>
           </div>

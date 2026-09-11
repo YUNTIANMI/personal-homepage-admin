@@ -331,3 +331,19 @@ export async function apiChangePassword(oldPassword: string, newPassword: string
     body: JSON.stringify({ oldPassword, newPassword }),
   })
 }
+
+/* ---------------- 导入导出 ---------------- */
+
+/** 导出全量数据（后端汇总） */
+export async function exportData(): Promise<unknown> {
+  return request<unknown>('/export')
+}
+
+/** 导入全量数据（后端事务写入，失败整体回滚） */
+export async function importData(payload: unknown): Promise<{
+  postsAdded: number
+  projectsAdded: number
+  siteUpdated: boolean
+}> {
+  return request('/import', { method: 'POST', body: JSON.stringify(payload) })
+}
