@@ -1,3 +1,4 @@
+import { forwardRef } from 'react'
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -84,13 +85,21 @@ export function IconBtn({
 export const inputCls =
   'input-base min-w-0 h-11 text-[15px] disabled:pointer-events-none disabled:opacity-50'
 
-export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn(inputCls, props.className)} />
-}
+/* 用 forwardRef 暴露原生节点，便于在编辑器里做「光标处插入」等操作 */
+export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
+  function Input(props, ref) {
+    return <input {...props} ref={ref} className={cn(inputCls, props.className)} />
+  },
+)
 
-export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={cn(inputCls, 'leading-relaxed', props.className)} />
-}
+export const Textarea = forwardRef<
+  HTMLTextAreaElement,
+  TextareaHTMLAttributes<HTMLTextAreaElement>
+>(function Textarea(props, ref) {
+  return (
+    <textarea {...props} ref={ref} className={cn(inputCls, 'leading-relaxed', props.className)} />
+  )
+})
 
 export function Field({
   label,

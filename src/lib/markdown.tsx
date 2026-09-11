@@ -15,6 +15,10 @@ const components: Components = {
       />
     )
   },
+  // 图片懒加载：长文含多图时不一次性拉取，减少首屏压力
+  img({ node, ...props }) {
+    return <img {...props} loading="lazy" decoding="async" />
+  },
   // 表格包一层横向滚动容器，长表格在窄屏不破版
   table({ node, ...props }) {
     return (

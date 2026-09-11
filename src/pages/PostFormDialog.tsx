@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
-import { CalendarDays, Eye, PenLine } from 'lucide-react'
+import { useMemo, useRef, useState, type ClipboardEvent, type DragEvent } from 'react'
+import { CalendarDays, Eye, ImagePlus, Loader2, PenLine } from 'lucide-react'
 import type { Post } from '../types'
 import { Dialog } from '../components/Dialog'
 import { TagInput } from '../components/TagInput'
-import { Button, Field, Input, Textarea, cn } from '../components/ui'
+import { Button, Field, Input, Textarea } from '../components/ui'
 import { MarkdownRenderer } from '../lib/markdown'
+import { uploadImage } from '../lib/storage'
 import { useStore } from '../store'
 import { useToast } from '../toast'
 import { todayISO, uid } from '../utils'
@@ -45,6 +46,11 @@ export function PostFormDialog({
   const [tab, setTab] = useState<'write' | 'preview'>('write')
   const [errors, setErrors] = useState<Partial<Record<keyof PostDraft, string>>>({})
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [dragging, setDragging] = useState(false)
+
+  const contentRef = useRef<HTMLTextAreaElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   function pick(p: Post): PostDraft {
     return {
@@ -63,6 +69,61 @@ export function PostFormDialog({
   }
 
   const canPreview = useMemo(() => draft.content.trim().length > 0, [draft.content])
+
+  /** 在光标处插入片段，并把光标移到片段之后 */
+  const insertAtCursor = (snippet: string) => {
+    const el = contentRef.current
+    if (!el) {
+      set('content', `${draft.content}${snippet}`)
+      return
+    }
+    const start = el.selectionStart ?? draft.content.length
+    const end = el.selectionEnd ?? start
+    const next = `${draft.content.slice(0, start)}${snippet}${draft.content.slice(end)}`
+    set('content', next)
+    requestAnimationFrame(() => {
+      el.focus()
+      const pos = start + snippet.length
+      el.setSelectionRange(pos, pos)
+    })
+  }
+
+  /** 上传图片并插入 Markdown 图片语法 */
+  const handleFiles = async (files: FileList | File[] | null) => {
+    const list = Array.from(files ?? []).filter((f) => f.type.startsWith('image/'))
+    if (list.length === 0) return
+
+    setUploading(true)
+    try {
+      for (const file of list) {
+        const { url } = await uploadImage(file)
+        const alt = file.name.replace(/\.[^.]+$/, '')
+        insertAtCursor(`\n![${alt}](${url})\n`)
+      }
+      toast.success(list.length > 1 ? `已插入 ${list.length} 张图片` : '图片已插入正文')
+    } catch (err) {
+      console.error('[post] 上传图片失败：', err)
+      const msg = err instanceof Error ? err.message : '上传失败'
+      toast.danger(`插入图片失败：${msg}`)
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = e.clipboardData?.files
+    if (files && files.length > 0 && files[0].type.startsWith('image/')) {
+      e.preventDefault()
+      void handleFiles(files)
+    }
+  }
+
+  const onDrop = (e: DragEvent<HTMLTextAreaElement>) => {
+    e.preventDefault()
+    setDragging(false)
+    if (e.dataTransfer?.files?.length) void handleFiles(e.dataTransfer.files)
+  }
 
   const validate = (): boolean => {
     const next: typeof errors = {}
@@ -112,7 +173,7 @@ export function PostFormDialog({
       size="xl"
       title={isEdit ? '编辑文章' : '新增文章'}
       subtitle={
-        isEdit ? '修改内容后保存，列表与阅读页会立即刷新。' : '正文使用 Markdown 编写，发布后自动渲染。'
+        isEdit ? '修改内容后保存，列表与展示站点会立即刷新。' : '正文使用 Markdown 编写，发布后自动渲染。'
       }
     >
       <div className="space-y-4">
@@ -137,7 +198,7 @@ export function PostFormDialog({
                 type="date"
                 value={draft.date}
                 onChange={(e) => set('date', e.target.value)}
-                className={cn('input-base', 'pl-9')}
+                className="input-base pl-9"
                 aria-label="日期"
               />
             </div>
@@ -168,46 +229,81 @@ export function PostFormDialog({
 
         <Field label="正文（Markdown）" required error={errors.content}>
           <div className="space-y-1.5">
-            <div
-              role="tablist"
-              aria-label="正文编辑模式"
-              className="inline-flex rounded-lg border border-line bg-canvas-soft p-0.5"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === 'write'}
-                onClick={() => setTab('write')}
-                className={cn(
-                  'focus-ring inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                  tab === 'write' ? 'bg-surface text-ink shadow-sm' : 'text-ink-faint hover:text-ink',
-                )}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div
+                role="tablist"
+                aria-label="正文编辑模式"
+                className="inline-flex rounded-lg border border-line bg-canvas-soft p-0.5"
               >
-                <PenLine size={13} /> 编写
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === 'preview'}
-                disabled={!canPreview}
-                onClick={() => setTab('preview')}
-                className={cn(
-                  'focus-ring inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                  tab === 'preview' ? 'bg-surface text-ink shadow-sm' : 'text-ink-faint hover:text-ink',
-                  !canPreview && 'opacity-45',
-                )}
-              >
-                <Eye size={13} /> 预览
-              </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === 'write'}
+                  onClick={() => setTab('write')}
+                  className={`focus-ring inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                    tab === 'write' ? 'bg-surface text-ink shadow-sm' : 'text-ink-faint hover:text-ink'
+                  }`}
+                >
+                  <PenLine size={13} /> 编写
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === 'preview'}
+                  disabled={!canPreview}
+                  onClick={() => setTab('preview')}
+                  className={`focus-ring inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                    tab === 'preview' ? 'bg-surface text-ink shadow-sm' : 'text-ink-faint hover:text-ink'
+                  } ${!canPreview ? 'opacity-45' : ''}`}
+                >
+                  <Eye size={13} /> 预览
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="hidden text-xs text-ink-faint sm:inline">
+                  支持拖拽 / 粘贴图片
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={uploading || tab !== 'write'}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  {uploading ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <ImagePlus size={14} />
+                  )}
+                  {uploading ? '上传中…' : '插入图片'}
+                </Button>
+              </div>
             </div>
+
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              multiple
+              className="hidden"
+              onChange={(e) => void handleFiles(e.target.files)}
+            />
 
             {tab === 'write' ? (
               <Textarea
+                ref={contentRef}
                 rows={14}
                 value={draft.content}
                 onChange={(e) => set('content', e.target.value)}
-                placeholder={'支持标题、列表、表格、引用、代码块高亮等 GFM 语法\n\n## 开始写作……'}
-                className="font-mono text-[13px] leading-relaxed"
+                onPaste={onPaste}
+                onDrop={onDrop}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  setDragging(true)
+                }}
+                onDragLeave={() => setDragging(false)}
+                placeholder={'支持标题、列表、表格、引用、代码块高亮等 GFM 语法\n可直接拖拽或粘贴图片上传\n\n## 开始写作……'}
+                className={`font-mono text-[13px] leading-relaxed ${dragging ? 'border-brand bg-brand-soft/40' : ''}`}
               />
             ) : canPreview ? (
               <div className="max-h-105 overflow-y-auto rounded-lg border border-line bg-surface p-4">
@@ -221,7 +317,7 @@ export function PostFormDialog({
           <Button variant="outline" onClick={onClose} disabled={saving}>
             取消
           </Button>
-          <Button variant="primary" onClick={save} disabled={saving}>
+          <Button variant="primary" onClick={() => void save()} disabled={saving}>
             {saving ? '保存中…' : isEdit ? '保存修改' : '发布文章'}
           </Button>
         </div>
