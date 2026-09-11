@@ -1,6 +1,8 @@
 package com.luoji.blog.common;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 
@@ -12,6 +14,11 @@ import java.util.function.Function;
  *
  * <p>分页由服务端完成（MyBatis-Plus 分页插件），前端只传页码与每页条数，
  * 不再一次性拉取全量数据后在浏览器里计算。
+ *
+ * <p><b>为什么需要 {@link JsonCreator}</b>：本类是不可变对象（{@code final} 字段 + 私有构造器），
+ * Jackson 默认无法反序列化——这会导致 Spring Cache 把本类写入 Redis 后，下次读取时抛
+ * {@code missingInstantiator} 使应用崩溃。标注 {@link JsonCreator} 后，Jackson 会通过该构造器
+ * 还原对象，缓存因此可安全序列化往返。
  */
 @Getter
 @Schema(description = "分页响应体")
@@ -32,7 +39,12 @@ public class PageResult<T> {
     @Schema(description = "当前页数据")
     private final List<T> records;
 
-    private PageResult(long total, long page, long size, long pages, List<T> records) {
+    @JsonCreator
+    public PageResult(@JsonProperty("total") long total,
+                      @JsonProperty("page") long page,
+                      @JsonProperty("size") long size,
+                      @JsonProperty("pages") long pages,
+                      @JsonProperty("records") List<T> records) {
         this.total = total;
         this.page = page;
         this.size = size;
