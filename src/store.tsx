@@ -199,11 +199,19 @@ async function mutateCloud(action: Action): Promise<Action> {
   switch (action.type) {
     case 'post/add': {
       const id = await createPost(action.post)
-      return { type: 'post/add', post: { ...action.post, id, createdAt: now, updatedAt: now } }
+      // 后端新建默认草稿、version 从 0 起，这里回填到本地 state 保持一致
+      return {
+        type: 'post/add',
+        post: { ...action.post, id, status: 'DRAFT', version: 0, createdAt: now, updatedAt: now },
+      }
     }
     case 'post/update': {
       await updatePost(action.post.id, action.post)
-      return { type: 'post/update', post: { ...action.post, updatedAt: now } }
+      // 后端乐观锁使 version +1，本地同步，否则下次编辑会误报 409
+      return {
+        type: 'post/update',
+        post: { ...action.post, version: (action.post.version ?? 0) + 1, updatedAt: now },
+      }
     }
     case 'post/delete':
       await deletePosts(action.ids)

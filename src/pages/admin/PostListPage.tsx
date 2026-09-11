@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
+  Archive,
   ArrowDownUp,
   ChevronLeft,
   ChevronRight,
   Eye,
   FileText,
+  History,
   Loader2,
   Pencil,
+  Pin,
+  PinOff,
   Plus,
   Search,
   Trash2,
@@ -17,10 +21,11 @@ import { SyncErrorBanner } from '../../components/AdminLayout'
 import { ConfirmDialog, Dialog } from '../../components/Dialog'
 import { Button, Chip, EmptyState, IconBtn, PageHead, cn } from '../../components/ui'
 import { MarkdownRenderer } from '../../lib/markdown'
+import { changePostStatus, fetchRevisions, rollbackPost, togglePostTop } from '../../lib/api'
 import { PostFormDialog } from '../PostFormDialog'
 import { useStore } from '../../store'
 import { useToast } from '../../toast'
-import type { Post } from '../../types'
+import type { Post, PostRevision } from '../../types'
 import { excerptOf } from '../../utils'
 
 const PAGE_SIZE = 10
@@ -67,9 +72,89 @@ function fmtDateShort(iso?: string): string {
   return d.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
-export function PostListPage() {
-  const { posts, dispatch, cloudEnabled, syncStatus } = useStore()
+const STATUS_LABEL: Record<string, { text: string; tone: 'brand' | 'ok' | 'neutral' | 'warn' }> = {
+  DRAFT: { text: '草稿', tone: 'neutral' },
+  PUBLISHED: { text: '已发布', tone: 'ok' },
+  ARCHIVED: { text: '已归档', tone: 'warn' },
+}
+
+/** 历史版本查看 / 回滚弹窗 */
+function RevisionDialog({ post, onClose }: { post: Post; onClose: () => void }) {
+  const { reload } = useStore()
   const toast = useToast()
+  const [revisions, setRevisions] = useState<PostRevision[]>([])
+  const [loading, setLoading] = useState(true)
+  const [rolling, setRolling] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const list = await fetchRevisions(post.id)
+        if (!cancelled) setRevisions(list)
+      } catch (err) {
+        if (!cancelled) toast.danger(err instanceof Error ? err.message : '读取版本失败')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [post.id, toast])
+
+  const doRollback = async (version: number) => {
+    setRolling(true)
+    try {
+      await rollbackPost(post.id, version)
+      await reload()
+      toast.success(`已回滚到版本 ${version}`)
+      onClose()
+    } catch (err) {
+      toast.danger(err instanceof Error ? err.message : '回滚失败')
+    } finally {
+      setRolling(false)
+    }
+  }
+
+  return (
+    <Dialog open onClose={onClose} title={`历史版本 · ${post.title}`} size="lg">
+      {loading ? (
+        <div className="flex items-center justify-center gap-2 py-16 text-ink-faint">
+          <Loader2 size={18} className="animate-spin" /> 正在读取版本…
+        </div>
+      ) : revisions.length === 0 ? (
+        <p className="py-10 text-center text-sm text-ink-faint">暂无历史版本（文章发布后才会留存快照）</p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {revisions.map((r) => (
+            <li key={r.version} className="flex items-center justify-between gap-3 py-3">
+              <div className="min-w-0">
+                <p className="font-mono text-xs text-ink-faint">
+                  版本 {r.version} · {fmtDateShort(r.createdAt)}
+                </p>
+                <p className="truncate text-[0.9375rem] text-ink">{r.title}</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={rolling}
+                onClick={() => void doRollback(r.version)}
+              >
+                回滚到此版本
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Dialog>
+  )
+}
+
+export function PostListPage() {
+  const { posts, dispatch, cloudEnabled, syncStatus, reload } = useStore()
+  const toast = useToast()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [query, setQuery] = useState('')
@@ -82,6 +167,8 @@ export function PostListPage() {
   const [editor, setEditor] = useState<{ post: Post | null } | null>(null)
   const [pendingDelete, setPendingDelete] = useState<number[]>([])
   const [preview, setPreview] = useState<Post | null>(null)
+  /** 历史版本弹窗：非 null 时显示该文章版本列表 */
+  const [revisionPost, setRevisionPost] = useState<Post | null>(null)
 
   // 仪表盘「新增文章」快捷入口：?new=1 → 打开新增弹窗并清掉参数
   useEffect(() => {
@@ -149,6 +236,30 @@ export function PostListPage() {
     }
   }
 
+  /** 状态流转：草稿 → 发布 → 归档 → 回退草稿（线性下一步） */
+  const changeStatus = async (post: Post) => {
+    const next = post.status === 'DRAFT' ? 'PUBLISHED' : post.status === 'PUBLISHED' ? 'ARCHIVED' : 'DRAFT'
+    try {
+      await changePostStatus(post.id, next, post.version ?? 0)
+      await reload()
+      toast.success(STATUS_LABEL[next] ? `已转为「${STATUS_LABEL[next].text}」` : '状态已更新')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '操作失败'
+      toast.danger(msg.includes('已被他人修改') ? '内容已被他人修改，请刷新后重试' : msg)
+    }
+  }
+
+  /** 置顶 / 取消置顶 */
+  const toggleTop = async (post: Post) => {
+    try {
+      await togglePostTop(post.id, post.isTop === 1 ? 0 : 1, post.sort ?? 0)
+      await reload()
+      toast.success(post.isTop === 1 ? '已取消置顶' : '已置顶')
+    } catch (err) {
+      toast.danger(err instanceof Error ? err.message : '操作失败')
+    }
+  }
+
   const isLoading = cloudEnabled && syncStatus === 'loading' && posts.length === 0
 
   return (
@@ -158,11 +269,16 @@ export function PostListPage() {
       <PageHead
         kicker="POSTS"
         title="文章管理"
-        desc="管理站点全部文章。支持搜索、排序、批量删除，正文使用 Markdown 编写。"
+        desc="管理站点全部文章。支持搜索、排序、状态流转、置顶与批量删除，正文使用 Markdown 编写。"
         actions={
-          <Button variant="primary" size="sm" onClick={() => setEditor({ post: null })}>
-            <Plus size={15} /> 新增文章
-          </Button>
+          <>
+            <Button variant="outline" size="sm" onClick={() => navigate('/admin/posts/trash')}>
+              <Trash2 size={15} /> 回收站
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => setEditor({ post: null })}>
+              <Plus size={15} /> 新增文章
+            </Button>
+          </>
         }
       />
 
@@ -272,10 +388,11 @@ export function PostListPage() {
                   </th>
                   <th className="min-w-56 px-4 py-3 font-medium">标题</th>
                   <th className="px-4 py-3 font-medium whitespace-nowrap">日期</th>
+                  <th className="px-4 py-3 font-medium whitespace-nowrap">状态</th>
                   <th className="px-4 py-3 font-medium whitespace-nowrap">分类</th>
                   <th className="min-w-40 px-4 py-3 font-medium">标签</th>
                   <th className="min-w-64 px-4 py-3 font-medium">摘要</th>
-                  <th className="w-28 px-4 py-3 text-right font-medium whitespace-nowrap">操作</th>
+                  <th className="w-56 px-4 py-3 text-right font-medium whitespace-nowrap">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -308,6 +425,15 @@ export function PostListPage() {
                       <td className="px-4 py-3.5 font-mono text-sm whitespace-nowrap text-ink-soft">
                         {fmtDateShort(post.date)}
                       </td>
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        {STATUS_LABEL[post.status ?? ''] ? (
+                          <Chip tone={STATUS_LABEL[post.status ?? ''].tone}>
+                            {STATUS_LABEL[post.status ?? ''].text}
+                          </Chip>
+                        ) : (
+                          <span className="text-ink-faint">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-ink-soft">
                         {post.category || '—'}
                       </td>
@@ -333,6 +459,24 @@ export function PostListPage() {
                           </IconBtn>
                           <IconBtn label="编辑" onClick={() => setEditor({ post })}>
                             <Pencil size={16} />
+                          </IconBtn>
+                          <IconBtn label="历史版本" onClick={() => setRevisionPost(post)}>
+                            <History size={16} />
+                          </IconBtn>
+                          <IconBtn
+                            label={post.isTop === 1 ? '取消置顶' : '置顶'}
+                            className={post.isTop === 1 ? 'text-brand' : ''}
+                            onClick={() => void toggleTop(post)}
+                          >
+                            {post.isTop === 1 ? <PinOff size={16} /> : <Pin size={16} />}
+                          </IconBtn>
+                          <IconBtn
+                            label={
+                              post.status === 'DRAFT' ? '发布' : post.status === 'PUBLISHED' ? '归档' : '回退草稿'
+                            }
+                            onClick={() => void changeStatus(post)}
+                          >
+                            <Archive size={16} />
                           </IconBtn>
                           <IconBtn
                             label="删除"
@@ -403,12 +547,15 @@ export function PostListPage() {
         title={pendingDelete.length > 1 ? '批量删除文章' : '删除文章'}
         message={
           pendingDelete.length > 1
-            ? `确定要删除选中的 ${pendingDelete.length} 篇文章吗？删除后无法恢复。`
-            : '确定要删除这篇文章吗？删除后无法恢复。'
+            ? `确定要删除选中的 ${pendingDelete.length} 篇文章吗？删除后可到回收站恢复。`
+            : '确定要删除这篇文章吗？删除后可到回收站恢复。'
         }
         onCancel={() => setPendingDelete([])}
         onConfirm={confirmDelete}
       />
+
+      {/* 历史版本 */}
+      {revisionPost && <RevisionDialog post={revisionPost} onClose={() => setRevisionPost(null)} />}
     </div>
   )
 }

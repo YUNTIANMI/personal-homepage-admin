@@ -10,12 +10,27 @@ export interface Post {
   content: string // Markdown 正文
   /** 文章状态：DRAFT / PUBLISHED / ARCHIVED（阶段四引入状态机后启用） */
   status?: string
+  /** 乐观锁版本号（编辑 / 状态流转时需原样带回） */
+  version?: number
+  /** 置顶：1 是 / 0 否 */
+  isTop?: number
+  /** 同组内排序权重，越大越靠前 */
+  sort?: number
   /** 内置示例数据标记，展示可删除标识；被编辑或删除后即视为普通数据 */
   isSample?: boolean
   /** 创建时间（后端返回，ISO 字符串） */
   createdAt?: string
   /** 最近更新时间（后端返回，ISO 字符串） */
   updatedAt?: string
+}
+
+/** 文章历史版本快照 */
+export interface PostRevision {
+  version: number
+  title: string
+  summary: string
+  content: string
+  createdAt: string
 }
 
 /** 项目外链（GitHub / Demo / Docs 等） */

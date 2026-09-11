@@ -9,7 +9,7 @@
  * - 认证：登录拿到 access（30 分钟）+ refresh（7 天），access 过期后用 refresh 静默续期；
  * - 分页：列表接口返回 `{ total, page, size, pages, records }`。
  */
-import type { AuthSession, AuthUser, Post, Project, SiteProfile } from '../types'
+import type { AuthSession, AuthUser, Post, PostRevision, Project, SiteProfile } from '../types'
 
 /** 后端 API 根地址（可被 VITE_API_BASE 覆盖，默认本地 8080） */
 const API_BASE = String(import.meta.env.VITE_API_BASE ?? 'http://localhost:8080/api').replace(/\/+$/, '')
@@ -188,6 +188,7 @@ interface PostInput {
   tags: string[]
   summary: string
   content: string
+  version?: number
 }
 
 function toPostInput(p: Post): PostInput {
@@ -198,6 +199,7 @@ function toPostInput(p: Post): PostInput {
     tags: p.tags ?? [],
     summary: p.description ?? '',
     content: p.content,
+    version: p.version,
   }
 }
 
@@ -215,6 +217,43 @@ export async function updatePost(id: number, post: Post): Promise<void> {
 export async function deletePosts(ids: number[]): Promise<void> {
   if (ids.length === 0) return
   await request<void>('/posts', { method: 'DELETE', body: JSON.stringify(ids) })
+}
+
+/** 状态流转（发布 / 归档 / 回退草稿），version 用于乐观锁 */
+export async function changePostStatus(id: number, status: string, version: number): Promise<void> {
+  await request<void>(`/posts/${id}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ status, version }),
+  })
+}
+
+/** 置顶开关与排序权重 */
+export async function togglePostTop(id: number, isTop: number, sort: number): Promise<void> {
+  await request<void>(`/posts/${id}/top`, {
+    method: 'PUT',
+    body: JSON.stringify({ isTop, sort }),
+  })
+}
+
+/** 回收站列表（已逻辑删除的文章） */
+export async function fetchTrashPosts(): Promise<Post[]> {
+  const page = await request<PageEnvelope<Post>>('/posts/trash?page=1&size=200')
+  return page.records ?? []
+}
+
+/** 从回收站恢复 */
+export async function restorePost(id: number): Promise<void> {
+  await request<void>(`/posts/${id}/restore`, { method: 'PUT' })
+}
+
+/** 历史版本列表 */
+export async function fetchRevisions(id: number): Promise<PostRevision[]> {
+  return request<PostRevision[]>(`/posts/${id}/revisions`)
+}
+
+/** 回滚到指定历史版本，返回回滚后的文章 */
+export async function rollbackPost(id: number, version: number): Promise<Post> {
+  return request<Post>(`/posts/${id}/revisions/${version}/rollback`, { method: 'POST' })
 }
 
 /* ---------------- 写操作（项目） ---------------- */

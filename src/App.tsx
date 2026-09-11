@@ -9,6 +9,7 @@ import { PostListPage } from './pages/admin/PostListPage'
 import { ProfilePage } from './pages/admin/ProfilePage'
 import { ProjectListPage } from './pages/admin/ProjectListPage'
 import { SettingsPage } from './pages/admin/SettingsPage'
+import { TrashPage } from './pages/admin/TrashPage'
 
 /**
  * 一个应用，两个区域：
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="posts" element={<PostListPage />} />
+          <Route path="posts/trash" element={<TrashPage />} />
           <Route path="projects" element={<ProjectListPage />} />
           <Route path="assets" element={<AssetsPage />} />
           <Route path="profile" element={<ProfilePage />} />

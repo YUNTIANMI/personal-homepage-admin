@@ -144,6 +144,8 @@ export function PostFormDialog({
       ...draft,
       // 新增时 id 为 0，由后端生成自增主键（store 拿到真实 id 后回填）
       id: isEdit && post ? post.id : 0,
+      // 编辑时带回乐观锁版本号，并发修改冲突时后端返回 409
+      version: isEdit && post ? post.version : undefined,
       title: draft.title.trim(),
       category: draft.category.trim(),
       description: draft.description.trim(),
@@ -161,7 +163,12 @@ export function PostFormDialog({
       onClose()
     } catch (err) {
       console.error('[post] 保存失败：', err)
-      toast.danger('保存失败：云端写入被拒绝，请确认登录状态与数据库权限')
+      const msg = err instanceof Error ? err.message : ''
+      toast.danger(
+        msg.includes('已被他人修改')
+          ? '内容已被他人修改，请刷新后重试'
+          : `保存失败：${msg || '请确认登录状态与数据库权限'}`,
+      )
     } finally {
       setSaving(false)
     }
