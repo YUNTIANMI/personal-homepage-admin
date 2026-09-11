@@ -7,6 +7,7 @@ import com.luoji.blog.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -61,7 +62,14 @@ public class SecurityConfig {
                                 "/api/ping",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html"
+                                "/swagger-ui.html",
+                                "/uploads/**"
+                        ).permitAll()
+                        // 展示端只读：文章 / 项目 / 标签 / 站点配置的 GET 对匿名开放
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/posts", "/api/posts/**",
+                                "/api/projects", "/api/projects/**",
+                                "/api/tags", "/api/site-config"
                         ).permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex

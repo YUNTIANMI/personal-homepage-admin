@@ -1,0 +1,53 @@
+package com.luoji.blog.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+/**
+ * 文章。
+ *
+ * <p>{@code status}（草稿 / 已发布 / 已归档）与 {@code version}（乐观锁）在阶段四启用，
+ * 本阶段新建文章统一写入 {@code PUBLISHED}。
+ */
+@Getter
+@Setter
+@TableName("post")
+public class Post extends BaseEntity {
+
+    @TableId(type = IdType.AUTO)
+    private Long id;
+
+    private String title;
+
+    /** 展示日期（对应前端 date 字段，格式 yyyy-MM-dd） */
+    private LocalDate postDate;
+
+    private String category;
+
+    private String summary;
+
+    /** Markdown 正文 */
+    private String content;
+
+    /** DRAFT / PUBLISHED / ARCHIVED */
+    private String status;
+
+    private Integer isTop;
+
+    private Integer sort;
+
+    private Integer viewCount;
+
+    /** 乐观锁版本号（阶段四启用） */
+    private Integer version;
+
+    private LocalDateTime publishedAt;
+
+    private Long authorId;
+}

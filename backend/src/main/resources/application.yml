@@ -54,6 +54,10 @@ jwt:
   access-expire-minutes: 30
   refresh-expire-days: 7
 
+# 文件存储（媒体上传）
+storage:
+  local-dir: uploads
+
 logging:
   pattern:
     console: "%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"
