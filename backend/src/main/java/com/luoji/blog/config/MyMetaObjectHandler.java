@@ -28,6 +28,10 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
 
     @Override
     public void updateFill(MetaObject metaObject) {
-        strictUpdateFill(metaObject, "updatedAt", LocalDateTime.class, LocalDateTime.now());
+        // updatedAt 是审计字段，每次更新都应刷新为当前时间。
+        // 用 setFieldValByName 而非 strictUpdateFill：updateById 前通常先 selectById 查回实体，
+        // 此时 updatedAt 已有旧值，strict 语义会跳过填充，导致「按更新时间排序」失效，
+        // 且显式 SET 旧值还会覆盖 MySQL 的 ON UPDATE CURRENT_TIMESTAMP。
+        setFieldValByName("updatedAt", LocalDateTime.now(), metaObject);
     }
 }
