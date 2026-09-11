@@ -1,0 +1,53 @@
+# =============================================================================
+# 公共配置（与环境无关的部分）
+# 环境相关配置见 application-dev.yml / application-prod.yml
+# 敏感项（数据库密码等）一律通过环境变量注入，不写入代码库
+# =============================================================================
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  application:
+    name: luoji-blog
+  profiles:
+    # 本地默认走 dev；生产用 -Dspring.profiles.active=prod 覆盖
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+  servlet:
+    multipart:
+      # 与媒体模块的校验规则保持一致（架构文档 §4，阶段三使用）
+      max-file-size: 5MB
+      max-request-size: 10MB
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.luoji.blog.entity
+  configuration:
+    # 下划线列名 -> 驼峰属性名
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+      # 逻辑删除：全局配置后，业务代码无需在每个实体上重复声明取值
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"
