@@ -29,4 +29,8 @@ public interface PostMapper extends BaseMapper<Post> {
     /** 从回收站恢复：把逻辑删除标记置回 0 */
     @Update("UPDATE post SET deleted = 0, updated_at = NOW() WHERE id = #{id} AND deleted = 1")
     int restoreById(@Param("id") Long id);
+
+    /** 浏览量批量累加（定时任务落库用） */
+    @Update("UPDATE post SET view_count = view_count + #{count} WHERE id = #{id}")
+    int incrementViewCount(@Param("id") Long id, @Param("count") long count);
 }

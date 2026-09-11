@@ -22,6 +22,9 @@ import com.luoji.blog.service.PostService;
 import com.luoji.blog.vo.PostRevisionVO;
 import com.luoji.blog.vo.PostVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -50,12 +53,17 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PostServiceImpl implements PostService {
 
+    private static final String VIEW_KEY_PREFIX = "post:view:";
+
     private final PostMapper postMapper;
     private final TagMapper tagMapper;
     private final PostTagMapper postTagMapper;
     private final PostRevisionMapper postRevisionMapper;
+    private final StringRedisTemplate redisTemplate;
 
     @Override
+    @Cacheable(cacheNames = "post:list",
+            key = "#query.page + ':' + #query.size + ':' + #query.keyword + ':' + #query.status + ':' + #query.sortBy + ':' + #query.order")
     public PageResult<PostVO> page(PostQueryDTO query) {
         long pageNo = Math.max(1, query.getPage());
         long size = Math.min(Math.max(1, query.getSize()), 200);
@@ -77,6 +85,7 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    @Cacheable(cacheNames = "post:detail", key = "#id")
     public PostVO get(Long id) {
         Post post = postMapper.selectById(id);
         if (post == null) {
@@ -87,6 +96,13 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    public void recordView(Long id) {
+        // 阅读时只做 Redis 自增，由 ViewCountTask 定时批量落库，避免每次阅读都写数据库
+        redisTemplate.opsForValue().increment(VIEW_KEY_PREFIX + id);
+    }
+
+    @Override
+    @CacheEvict(cacheNames = {"post:detail", "post:list"}, allEntries = true)
     public Long create(PostSaveDTO dto, Long authorId) {
         Post post = new Post();
         applyDraft(post, dto);
@@ -103,6 +119,7 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    @CacheEvict(cacheNames = {"post:detail", "post:list"}, allEntries = true)
     public void update(Long id, PostSaveDTO dto) {
         if (dto.getVersion() == null) {
             throw new BizException(ErrorCode.PARAM_INVALID, "编辑需要携带版本号（version）");
@@ -122,6 +139,7 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    @CacheEvict(cacheNames = {"post:detail", "post:list"}, allEntries = true)
     public void delete(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             return;
@@ -144,6 +162,7 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(cacheNames = {"post:detail", "post:list"}, allEntries = true)
     public void changeStatus(Long id, PostStatusDTO dto, Long editorId) {
         Post post = postMapper.selectById(id);
         if (post == null) {
@@ -173,6 +192,7 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    @CacheEvict(cacheNames = {"post:detail", "post:list"}, allEntries = true)
     public void toggleTop(Long id, PostTopDTO dto) {
         Post post = postMapper.selectById(id);
         if (post == null) {
@@ -198,6 +218,7 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    @CacheEvict(cacheNames = {"post:detail", "post:list"}, allEntries = true)
     public void restore(Long id) {
         int rows = postMapper.restoreById(id);
         if (rows == 0) {
@@ -220,6 +241,7 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(cacheNames = {"post:detail", "post:list"}, allEntries = true)
     public PostVO rollback(Long id, Integer version, Long editorId) {
         Post post = postMapper.selectById(id);
         if (post == null) {

@@ -48,4 +48,7 @@ public interface PostService {
 
     /** 回滚到指定历史版本（回滚本身也是一次事务，并生成新快照） */
     PostVO rollback(Long id, Integer version, Long editorId);
+
+    /** 记录一次阅读：Redis 自增浏览量，由定时任务批量落库 */
+    void recordView(Long id);
 }

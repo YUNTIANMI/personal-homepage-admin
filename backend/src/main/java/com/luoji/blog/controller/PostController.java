@@ -45,7 +45,10 @@ public class PostController {
     @Operation(summary = "文章详情（公开）")
     @GetMapping("/posts/{id}")
     public Result<PostVO> get(@PathVariable Long id) {
-        return Result.ok(postService.get(id));
+        Result<PostVO> result = Result.ok(postService.get(id));
+        // 阅读计数：Redis 自增（不经过缓存），由 ViewCountTask 定时批量落库
+        postService.recordView(id);
+        return result;
     }
 
     @Operation(summary = "新建文章")

@@ -8,6 +8,8 @@ import com.luoji.blog.mapper.SiteConfigMapper;
 import com.luoji.blog.service.SiteConfigService;
 import com.luoji.blog.vo.SiteConfigVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -24,6 +26,7 @@ public class SiteConfigServiceImpl implements SiteConfigService {
     private final ObjectMapper objectMapper;
 
     @Override
+    @Cacheable(cacheNames = "site:config", key = "'single'")
     public SiteConfigVO get() {
         SiteConfig config = configMapper.selectById(CONFIG_ID);
         if (config == null) {
@@ -33,6 +36,7 @@ public class SiteConfigServiceImpl implements SiteConfigService {
     }
 
     @Override
+    @CacheEvict(cacheNames = "site:config", allEntries = true)
     public void update(SiteConfigSaveDTO dto) {
         SiteConfig config = configMapper.selectById(CONFIG_ID);
         boolean isInsert = config == null;

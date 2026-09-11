@@ -3,18 +3,23 @@ package com.luoji.blog;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * 罗辑个人主页 · 后端服务启动类。
  *
  * <p>单体分层架构：Controller（收参）/ Service（业务）/ Mapper（数据访问）。
  * 本类不做任何业务配置，配置统一放在 {@code config} 包；
- * {@link EnableAsync} 用于审计日志异步落库（{@code @Async}）。
+ * {@link EnableAsync} 用于审计日志异步落库、{@link EnableCaching} 用于文章/配置缓存、
+ * {@link EnableScheduling} 用于浏览量定时落库。
  */
 @SpringBootApplication
 @MapperScan("com.luoji.blog.mapper")
 @EnableAsync
+@EnableCaching
+@EnableScheduling
 public class BlogApplication {
 
     public static void main(String[] args) {
