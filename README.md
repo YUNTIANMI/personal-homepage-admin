@@ -48,6 +48,8 @@
 
 > 验收明细见 [`docs/ADMIN-STAGE2-REQUIREMENTS.md`](./docs/ADMIN-STAGE2-REQUIREMENTS.md) §8；测试产生的数据已全部清理。
 
+📋 **下一阶段（规划中，尚未开工）**：将后端由 Supabase 托管服务替换为**自研 Java + Spring Boot 服务**，用于展示常规后端开发能力（分层、鉴权、事务、并发控制、缓存、审计）。**功能范围只增不减**，前端预计仅改动数据访问层（约 10%）。规划见 [`docs/BACKEND-REQUIREMENTS.md`](./docs/BACKEND-REQUIREMENTS.md) · [`docs/BACKEND-ARCHITECTURE.md`](./docs/BACKEND-ARCHITECTURE.md) · [`docs/BACKEND-PLAN.md`](./docs/BACKEND-PLAN.md)。
+
 ## 三、技术栈
 
 | 分类 | 选型 |
@@ -182,6 +184,9 @@ docs/                           需求与交接文档
 | `docs/ADMIN-REQUIREMENTS.md` | 后台开发需求（功能编号、验收标准、风险清单） |
 | `docs/REQUIREMENTS.md` | 前台站点原始需求 |
 | `docs/ADMIN-STAGE2-REQUIREMENTS.md` | 阶段二开发文档（需求 + 技术选型） |
+| `docs/BACKEND-REQUIREMENTS.md` | **后端改造需求**（Java + Spring Boot 版：功能只增不减，新增 8 项后端向能力） |
+| `docs/BACKEND-ARCHITECTURE.md` | **后端技术架构**（选型理由、分层、9 项关键机制、12 张表 DDL、接口契约） |
+| `docs/BACKEND-PLAN.md` | **后端开发计划**（M0～M6 里程碑、时间档位、答辩演示脚本、砍需求顺序） |
 
 ## License
 
