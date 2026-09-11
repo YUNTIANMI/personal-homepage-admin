@@ -1,11 +1,16 @@
 package com.luoji.blog.controller;
 
+import com.luoji.blog.annotation.OperationLog;
 import com.luoji.blog.common.PageResult;
 import com.luoji.blog.common.Result;
+import com.luoji.blog.common.enums.LogModule;
 import com.luoji.blog.dto.PostQueryDTO;
 import com.luoji.blog.dto.PostSaveDTO;
+import com.luoji.blog.dto.PostStatusDTO;
+import com.luoji.blog.dto.PostTopDTO;
 import com.luoji.blog.security.SecurityUtils;
 import com.luoji.blog.service.PostService;
+import com.luoji.blog.vo.PostRevisionVO;
 import com.luoji.blog.vo.PostVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,19 +49,65 @@ public class PostController {
     }
 
     @Operation(summary = "新建文章")
+    @OperationLog(module = LogModule.POST, action = "CREATE")
     @PostMapping("/posts")
     public Result<Long> create(@Valid @RequestBody PostSaveDTO dto) {
         return Result.ok(postService.create(dto, SecurityUtils.getUserId()));
     }
 
     @Operation(summary = "编辑文章")
+    @OperationLog(module = LogModule.POST, action = "UPDATE")
     @PutMapping("/posts/{id}")
     public Result<Void> update(@PathVariable Long id, @Valid @RequestBody PostSaveDTO dto) {
         postService.update(id, dto);
         return Result.ok();
     }
 
+    @Operation(summary = "状态流转（发布 / 归档 / 回退草稿）")
+    @OperationLog(module = LogModule.POST, action = "STATUS")
+    @PutMapping("/posts/{id}/status")
+    public Result<Void> changeStatus(@PathVariable Long id, @Valid @RequestBody PostStatusDTO dto) {
+        postService.changeStatus(id, dto, SecurityUtils.getUserId());
+        return Result.ok();
+    }
+
+    @Operation(summary = "置顶开关与排序权重")
+    @OperationLog(module = LogModule.POST, action = "TOP")
+    @PutMapping("/posts/{id}/top")
+    public Result<Void> toggleTop(@PathVariable Long id, @RequestBody PostTopDTO dto) {
+        postService.toggleTop(id, dto);
+        return Result.ok();
+    }
+
+    @Operation(summary = "回收站列表")
+    @GetMapping("/posts/trash")
+    public Result<PageResult<PostVO>> trashPage(PostQueryDTO query) {
+        return Result.ok(postService.trashPage(query));
+    }
+
+    @Operation(summary = "从回收站恢复")
+    @OperationLog(module = LogModule.POST, action = "RESTORE")
+    @PutMapping("/posts/{id}/restore")
+    public Result<Void> restore(@PathVariable Long id) {
+        postService.restore(id);
+        return Result.ok();
+    }
+
+    @Operation(summary = "历史版本列表")
+    @GetMapping("/posts/{id}/revisions")
+    public Result<List<PostRevisionVO>> revisions(@PathVariable Long id) {
+        return Result.ok(postService.listRevisions(id));
+    }
+
+    @Operation(summary = "回滚到指定历史版本")
+    @OperationLog(module = LogModule.POST, action = "ROLLBACK")
+    @PostMapping("/posts/{id}/revisions/{version}/rollback")
+    public Result<PostVO> rollback(@PathVariable Long id, @PathVariable Integer version) {
+        return Result.ok(postService.rollback(id, version, SecurityUtils.getUserId()));
+    }
+
     @Operation(summary = "删除单篇文章（逻辑删除）")
+    @OperationLog(module = LogModule.POST, action = "DELETE")
     @DeleteMapping("/posts/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         postService.delete(List.of(id));
@@ -64,6 +115,7 @@ public class PostController {
     }
 
     @Operation(summary = "批量删除文章（逻辑删除）")
+    @OperationLog(module = LogModule.POST, action = "DELETE")
     @DeleteMapping("/posts")
     public Result<Void> deleteBatch(@RequestBody List<Long> ids) {
         postService.delete(ids);

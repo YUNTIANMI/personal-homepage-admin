@@ -19,6 +19,9 @@ public class PostQueryDTO {
 
     private String keyword;
 
+    /** 按状态筛选：DRAFT / PUBLISHED / ARCHIVED；留空表示全部 */
+    private String status;
+
     private String sortBy = "updated";
 
     private String order = "desc";

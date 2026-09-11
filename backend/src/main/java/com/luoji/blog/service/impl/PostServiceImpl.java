@@ -5,20 +5,28 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.luoji.blog.common.BizException;
 import com.luoji.blog.common.ErrorCode;
 import com.luoji.blog.common.PageResult;
+import com.luoji.blog.common.enums.PostStatus;
 import com.luoji.blog.dto.PostQueryDTO;
 import com.luoji.blog.dto.PostSaveDTO;
+import com.luoji.blog.dto.PostStatusDTO;
+import com.luoji.blog.dto.PostTopDTO;
 import com.luoji.blog.entity.Post;
+import com.luoji.blog.entity.PostRevision;
 import com.luoji.blog.entity.PostTag;
 import com.luoji.blog.entity.Tag;
 import com.luoji.blog.mapper.PostMapper;
+import com.luoji.blog.mapper.PostRevisionMapper;
 import com.luoji.blog.mapper.PostTagMapper;
 import com.luoji.blog.mapper.TagMapper;
 import com.luoji.blog.service.PostService;
+import com.luoji.blog.vo.PostRevisionVO;
 import com.luoji.blog.vo.PostVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -29,19 +37,23 @@ import java.util.stream.Collectors;
 /**
  * 文章服务实现。
  *
- * <p>标签多对多：保存时按名「查或建」标签并重建关联；查询时按当前页文章 id 批量取回，
- * 固定次数查询（不产生 N+1），然后聚合回 {@code string[]} 返回给前端。
+ * <p>阶段四引入的核心机制：
+ * <ul>
+ *   <li><b>状态机</b>：合法流转边集中在 {@link PostStatus}，非法流转抛 {@code STATE_ILLEGAL}；</li>
+ *   <li><b>乐观锁</b>：{@code @Version} 字段 + 客户端带回 version，冲突返回 409；</li>
+ *   <li><b>事务</b>：发布时在同一事务内更新状态 + 写入历史版本快照，任一失败整体回滚；</li>
+ *   <li><b>历史版本</b>：每次发布留快照，支持查看与回滚（回滚本身也生成新快照）；</li>
+ *   <li><b>回收站</b>：逻辑删除后可在回收站恢复。</li>
+ * </ul>
  */
 @Service
 @RequiredArgsConstructor
 public class PostServiceImpl implements PostService {
 
-    /** 阶段三新建文章统一发布；状态机在阶段四引入 */
-    private static final String DEFAULT_STATUS = "PUBLISHED";
-
     private final PostMapper postMapper;
     private final TagMapper tagMapper;
     private final PostTagMapper postTagMapper;
+    private final PostRevisionMapper postRevisionMapper;
 
     @Override
     public PageResult<PostVO> page(PostQueryDTO query) {
@@ -55,16 +67,13 @@ public class PostServiceImpl implements PostService {
                     .or().like(Post::getSummary, kw)
                     .or().like(Post::getContent, kw));
         }
+        if (StringUtils.hasText(query.getStatus())) {
+            qw.eq(Post::getStatus, query.getStatus().trim().toUpperCase());
+        }
         applySort(qw, query);
 
         Page<Post> page = postMapper.selectPage(new Page<>(pageNo, size), qw);
-
-        List<Post> records = page.getRecords();
-        Map<Long, List<String>> tagsByPost = records.isEmpty()
-                ? Map.of()
-                : loadTagsByPost(records.stream().map(Post::getId).toList());
-
-        return PageResult.of(page, post -> toVO(post, tagsByPost.getOrDefault(post.getId(), List.of())));
+        return toPageResult(page);
     }
 
     @Override
@@ -81,10 +90,11 @@ public class PostServiceImpl implements PostService {
     public Long create(PostSaveDTO dto, Long authorId) {
         Post post = new Post();
         applyDraft(post, dto);
-        post.setStatus(DEFAULT_STATUS);
+        post.setStatus(PostStatus.DRAFT.name());
         post.setIsTop(0);
         post.setSort(0);
         post.setViewCount(0);
+        post.setVersion(0);
         post.setAuthorId(authorId);
         postMapper.insert(post);
 
@@ -94,13 +104,20 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public void update(Long id, PostSaveDTO dto) {
+        if (dto.getVersion() == null) {
+            throw new BizException(ErrorCode.PARAM_INVALID, "编辑需要携带版本号（version）");
+        }
         Post post = postMapper.selectById(id);
         if (post == null) {
             throw new BizException(ErrorCode.NOT_FOUND);
         }
         applyDraft(post, dto);
-        postMapper.updateById(post);
-
+        // 乐观锁：用客户端带回的版本号作为更新条件，并发修改时影响行数为 0
+        post.setVersion(dto.getVersion());
+        int rows = postMapper.updateById(post);
+        if (rows == 0) {
+            throw new BizException(ErrorCode.VERSION_CONFLICT);
+        }
         saveTags(id, dto.getTags());
     }
 
@@ -109,7 +126,7 @@ public class PostServiceImpl implements PostService {
         if (ids == null || ids.isEmpty()) {
             return;
         }
-        // 逻辑删除：MyBatis-Plus 的 @TableLogic 自动把 DELETE 改写为 UPDATE deleted=1
+        // 逻辑删除：@TableLogic 自动把 DELETE 改写为 UPDATE deleted=1（进回收站）
         postMapper.deleteBatchIds(ids);
     }
 
@@ -125,7 +142,121 @@ public class PostServiceImpl implements PostService {
                 .toList();
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void changeStatus(Long id, PostStatusDTO dto, Long editorId) {
+        Post post = postMapper.selectById(id);
+        if (post == null) {
+            throw new BizException(ErrorCode.NOT_FOUND);
+        }
+
+        PostStatus from = PostStatus.of(post.getStatus());
+        PostStatus to = PostStatus.of(dto.getStatus());
+        // 状态机：非法流转（如 已归档 → 已发布）直接拒绝
+        PostStatus.checkTransition(from, to);
+
+        // 乐观锁 + 状态落地
+        post.setStatus(to.name());
+        post.setVersion(dto.getVersion());
+        if (to == PostStatus.PUBLISHED) {
+            post.setPublishedAt(LocalDateTime.now());
+        }
+        int rows = postMapper.updateById(post);
+        if (rows == 0) {
+            throw new BizException(ErrorCode.VERSION_CONFLICT);
+        }
+
+        // 发布：在同一事务内留存历史版本快照（跨 post / post_revision 两张表写入）
+        if (to == PostStatus.PUBLISHED) {
+            saveSnapshot(post, editorId, dto.getVersion() + 1);
+        }
+    }
+
+    @Override
+    public void toggleTop(Long id, PostTopDTO dto) {
+        Post post = postMapper.selectById(id);
+        if (post == null) {
+            throw new BizException(ErrorCode.NOT_FOUND);
+        }
+        if (dto.getIsTop() != null) {
+            post.setIsTop(dto.getIsTop() == 1 ? 1 : 0);
+        }
+        if (dto.getSort() != null) {
+            post.setSort(dto.getSort());
+        }
+        postMapper.updateById(post);
+    }
+
+    @Override
+    public PageResult<PostVO> trashPage(PostQueryDTO query) {
+        long pageNo = Math.max(1, query.getPage());
+        long size = Math.min(Math.max(1, query.getSize()), 200);
+        String keyword = StringUtils.hasText(query.getKeyword()) ? query.getKeyword().trim() : null;
+
+        Page<Post> page = postMapper.selectTrashPage(new Page<>(pageNo, size), keyword);
+        return toPageResult(page);
+    }
+
+    @Override
+    public void restore(Long id) {
+        int rows = postMapper.restoreById(id);
+        if (rows == 0) {
+            throw new BizException(ErrorCode.NOT_FOUND);
+        }
+    }
+
+    @Override
+    public List<PostRevisionVO> listRevisions(Long id) {
+        if (postMapper.selectById(id) == null) {
+            throw new BizException(ErrorCode.NOT_FOUND);
+        }
+        return postRevisionMapper.selectList(new LambdaQueryWrapper<PostRevision>()
+                        .eq(PostRevision::getPostId, id)
+                        .orderByDesc(PostRevision::getVersion))
+                .stream()
+                .map(this::toRevisionVO)
+                .toList();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public PostVO rollback(Long id, Integer version, Long editorId) {
+        Post post = postMapper.selectById(id);
+        if (post == null) {
+            throw new BizException(ErrorCode.NOT_FOUND);
+        }
+        PostRevision revision = postRevisionMapper.selectOne(new LambdaQueryWrapper<PostRevision>()
+                .eq(PostRevision::getPostId, id)
+                .eq(PostRevision::getVersion, version));
+        if (revision == null) {
+            throw new BizException(ErrorCode.NOT_FOUND, "历史版本不存在");
+        }
+
+        // 用快照覆盖当前内容（乐观锁自动 +1，并发修改时影响行数为 0）
+        post.setTitle(revision.getTitle());
+        post.setSummary(revision.getSummary());
+        post.setContent(revision.getContent());
+        int rows = postMapper.updateById(post);
+        if (rows == 0) {
+            throw new BizException(ErrorCode.VERSION_CONFLICT);
+        }
+
+        // 回滚本身也生成一个新快照，记录「内容被回滚到版本 X」
+        int nextVersion = (post.getVersion() == null ? 0 : post.getVersion()) + 1;
+        saveSnapshot(post, editorId, nextVersion);
+
+        return get(id);
+    }
+
     /* ---------------- 内部方法 ---------------- */
+
+    private PageResult<PostVO> toPageResult(Page<Post> page) {
+        List<Post> records = page.getRecords();
+        Map<Long, List<String>> tagsByPost = records.isEmpty()
+                ? Map.of()
+                : loadTagsByPost(records.stream().map(Post::getId).toList());
+        return PageResult.of(page, post -> toVO(post, tagsByPost.getOrDefault(post.getId(), List.of())));
+    }
 
     private void applyDraft(Post post, PostSaveDTO dto) {
         post.setTitle(dto.getTitle().trim());
@@ -136,13 +267,15 @@ public class PostServiceImpl implements PostService {
     }
 
     private void applySort(LambdaQueryWrapper<Post> qw, PostQueryDTO query) {
+        // 置顶优先 + 权重，再按指定字段排序
+        qw.orderByDesc(Post::getIsTop).orderByDesc(Post::getSort);
+
         boolean asc = "asc".equalsIgnoreCase(query.getOrder());
         String sortBy = query.getSortBy() == null ? "" : query.getSortBy();
         switch (sortBy) {
             case "date" -> qw.orderBy(true, asc, Post::getPostDate);
             case "title" -> qw.orderBy(true, asc, Post::getTitle);
-            case "updated" -> qw.orderBy(true, asc, Post::getUpdatedAt);
-            default -> qw.orderByDesc(Post::getUpdatedAt);
+            default -> qw.orderBy(true, asc, Post::getUpdatedAt);
         }
     }
 
@@ -185,6 +318,19 @@ public class PostServiceImpl implements PostService {
                         Collectors.filtering(Objects::nonNull, Collectors.toList()))));
     }
 
+    /** 留存历史版本快照（发布 / 回滚时调用，须在事务内） */
+    private void saveSnapshot(Post post, Long editorId, int version) {
+        PostRevision revision = new PostRevision();
+        revision.setPostId(post.getId());
+        revision.setVersion(version);
+        revision.setTitle(post.getTitle());
+        revision.setSummary(post.getSummary());
+        revision.setContent(post.getContent());
+        revision.setEditorId(editorId);
+        revision.setCreatedAt(LocalDateTime.now());
+        postRevisionMapper.insert(revision);
+    }
+
     private PostVO toVO(Post post, List<String> tags) {
         return PostVO.builder()
                 .id(post.getId())
@@ -195,8 +341,21 @@ public class PostServiceImpl implements PostService {
                 .description(post.getSummary())
                 .content(post.getContent())
                 .status(post.getStatus())
+                .version(post.getVersion())
+                .isTop(post.getIsTop())
+                .sort(post.getSort())
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())
+                .build();
+    }
+
+    private PostRevisionVO toRevisionVO(PostRevision revision) {
+        return PostRevisionVO.builder()
+                .version(revision.getVersion())
+                .title(revision.getTitle())
+                .summary(revision.getSummary())
+                .content(revision.getContent())
+                .createdAt(revision.getCreatedAt())
                 .build();
     }
 }

@@ -3,6 +3,7 @@ package com.luoji.blog.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -12,8 +13,9 @@ import java.time.LocalDateTime;
 /**
  * 文章。
  *
- * <p>{@code status}（草稿 / 已发布 / 已归档）与 {@code version}（乐观锁）在阶段四启用，
- * 本阶段新建文章统一写入 {@code PUBLISHED}。
+ * <p>{@code status}（草稿 / 已发布 / 已归档）配合 {@link com.luoji.blog.common.enums.PostStatus}
+ * 状态机做合法流转校验；{@code version} 标注 {@link Version} 后由 MyBatis-Plus 乐观锁插件
+ * 自动在更新语句追加 {@code AND version = ?}，并发编辑冲突时影响行数为 0 → 返回 409。
  */
 @Getter
 @Setter
@@ -44,7 +46,8 @@ public class Post extends BaseEntity {
 
     private Integer viewCount;
 
-    /** 乐观锁版本号（阶段四启用） */
+    /** 乐观锁版本号（@Version 由 MyBatis-Plus 插件自动生效） */
+    @Version
     private Integer version;
 
     private LocalDateTime publishedAt;

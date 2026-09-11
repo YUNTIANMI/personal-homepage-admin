@@ -34,4 +34,7 @@ public class PostSaveDTO {
     @NotBlank(message = "正文不能为空")
     @Size(min = 6, message = "正文至少 6 个字符")
     private String content;
+
+    /** 乐观锁版本号：编辑时必填（新增时后端置 0） */
+    private Integer version;
 }
