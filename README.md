@@ -39,6 +39,15 @@
 
 > 未做项（经确认）：草稿 / 发布状态、置顶排序、文章可分享直链、操作日志、回收站。
 
+✅ **全量端到端回归已通过**（2026-09-11，真实 Supabase + 浏览器自动化）：
+
+| 区域 | 覆盖内容 |
+| --- | --- |
+| 展示站点 | 首页 / 博客（列表、搜索、空态、阅读页）、项目（空态与有数据）、关于、页内切换不改地址栏、未知路径兜底、移动端导航 |
+| 后台 | 路由守卫、登录（校验 / 错误凭据 / 登录后跳回）、仪表盘、文章（增删改查、搜索、3 种排序、分页、多选批量删除、GFM 预览）、项目（增删改查、外链校验、展示站联动）、媒体库（上传 / 删除）、站点配置（校验 / 保存 / 展示站联动）、设置（导出 / 导入差异预览 / 改密校验）、主题切换与持久化、移动端抽屉、登出与守卫复检 |
+
+> 验收明细见 [`docs/ADMIN-STAGE2-REQUIREMENTS.md`](./docs/ADMIN-STAGE2-REQUIREMENTS.md) §8；测试产生的数据已全部清理。
+
 ## 三、技术栈
 
 | 分类 | 选型 |
@@ -68,6 +77,13 @@ npm run typecheck # 仅类型检查
 
 - 展示站点 → `http://localhost:5174/`
 - 后台入口 → `http://localhost:5174/login`
+
+> **访问地址建议用 `localhost` 或 `127.0.0.1`**：它们是浏览器认定的「安全上下文」，Web API 完整可用。
+> 若改用局域网 IP（如 `http://10.14.6.176:5174`）访问，会进入**非安全上下文**，
+> `crypto.randomUUID`、`navigator.clipboard` 等 API 将不可用。本项目已对这两处做了兼容回退
+> （`utils.ts` 的 `uid()` 与 `copyToClipboard()`），功能不受影响；但 HTTP 明文会暴露管理员密码
+> 与会话令牌，**正式使用务必走 HTTPS**（部署到静态托管，或为 Vite 配置自签证书）。
+> `vite.config.ts` 已设置 `server.host: true`，局域网访问本身是通的。
 
 ## 五、环境变量
 
@@ -114,9 +130,14 @@ VITE_SUPABASE_ANON_KEY=<publishable / anon key>
 
 1. **Authentication → Sign In / Providers → Email**：启用，并关闭 *Allow new users to sign up*（单管理员）；
 2. **Authentication → Users → Add user**：创建管理员账号，并勾选 *Auto Confirm User*；
-3. **SQL Editor**：依次执行 `0001`、`0002` 迁移脚本；
+3. **SQL Editor**：依次执行 `0001`、`0002`、`0004`、`0005` 四个迁移脚本（均幂等）；
 4. 验证保活：用 anon key 请求 `{URL}/rest/v1/posts?select=id&limit=1`，应返回 **200**。
 
+> ⚠️ 第 2 步**必须在第 3 步之前**完成：`0001`/`0002` 会把写权限收紧为「登录且会话有效」，之后再用 anon 写入会被 RLS 拒绝。
+>
+> ⚠️ **密码长度**：后台「修改密码」表单要求 ≥ 6 位（与 Supabase 密码策略一致）。
+> 控制台手动 Add user 时不受该限制，因此**别在控制台设置少于 6 位的密码**——那样登录没问题，但之后无法通过后台改回短密码。
+>
 > 「登录满 N 天强制重新登录」也可通过 Dashboard → **Authentication → Sessions** 的 *Time-box user sessions* 实现，
 > 但那是 **Pro 计划**功能；本仓库改用 SQL 函数实现，**免费计划同样有效**。
 

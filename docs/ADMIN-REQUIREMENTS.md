@@ -3,9 +3,9 @@
 | 项目 | 内容 |
 | --- | --- |
 | 项目代号 | `luoji-admin` |
-| 文档版本 | **v1.2** |
-| 撰写日期 | 2026-09-10（v1.0） / 2026-09-11（v1.1 / v1.2） |
-| 文档状态 | **阶段一、阶段二均已交付**（S2.1 / S2.5 经确认不做） |
+| 文档版本 | **v1.3** |
+| 撰写日期 | 2026-09-10（v1.0） / 2026-09-11（v1.1 / v1.2 / v1.3） |
+| 文档状态 | **阶段一、阶段二均已交付并通过全量回归验收**（S2.1 / S2.5 经确认不做） |
 | 目标产物 | 单应用双区域：`/` 对外展示站点（只读）+ `/admin` 后台管理 |
 | 需求来源 | [`docs/ADMIN-PANEL-HANDOFF.md`](./ADMIN-PANEL-HANDOFF.md)（技术事实基线） |
 | 关联文档 | [`README.md`](../README.md) · [`docs/REQUIREMENTS.md`](./REQUIREMENTS.md)（源项目原始需求） · [`docs/ADMIN-STAGE2-REQUIREMENTS.md`](./ADMIN-STAGE2-REQUIREMENTS.md)（阶段二需求与技术选型） |
@@ -394,7 +394,8 @@ src/
     ├── HomePage / BlogPage / PostReader / ProjectsPage / AboutPage   展示页（只读）
     ├── LoginPage.tsx
     ├── PostFormDialog / ProjectFormDialog
-    └── admin/                  DashboardPage · PostListPage · ProjectListPage
+    └── admin/                  DashboardPage · PostListPage · ProjectListPage ·
+                                AssetsPage（媒体库）· ProfilePage（站点配置）· SettingsPage（导入导出 / 改密码）
 supabase/migrations/            数据库迁移脚本
 docs/                           需求与交接文档
 ```
@@ -408,7 +409,7 @@ docs/                           需求与交接文档
 | 标签输入 / 外链多行编辑 | `components/TagInput.tsx` / `components/LinkRowsEditor.tsx` |
 | Markdown 渲染 | `lib/markdown.tsx` |
 | 云端数据与鉴权 | `lib/cloud.ts` |
-| 工具函数（uid / todayISO / fmtDate / isValidHttpUrl / readingMinutes） | `utils.ts` |
+| 工具函数（uid / todayISO / fmtDate / isValidHttpUrl / readingMinutes / excerptOf / copyToClipboard） | `utils.ts` |
 | 设计 Token 与根字号阶梯 | `styles.css` |
 
 ---
@@ -420,3 +421,4 @@ docs/                           需求与交接文档
 | v1.0 | 2026-09-10 | 初版：由交接文档整理为可评审、可验收的需求（认证 / 仪表盘 / 文章 / 项目 / Markdown + 数据与权限设计） |
 | v1.1 | 2026-09-11 | 项目定位升级为「展示站点 + 后台管理」双区域；新增 §5.1 展示站点需求与 FR-A09/A10 会话有效期；源项目冻结；需求项补实现状态；同步更新里程碑、验收结果、风险与目录结构 |
 | v1.2 | 2026-09-11 | 阶段二交付（S2.2 媒体能力 / S2.3 站点配置 / S2.4 运维能力）；`FR-S01/02`、`FR-U01~03`、`FR-M05`、`FR-T02/03` 标记为已实现；草稿发布与置顶排序（S2.1）、文章直链等（S2.5）经确认本期不做 |
+| v1.3 | 2026-09-11 | **全量端到端回归通过**（真实 Supabase + 浏览器自动化），文档状态更新为「已交付并验收」；修复摘要 Markdown 泄漏与两处非安全上下文兼容问题；清理死代码并收紧模块导出；补充访问地址与密码策略注意事项。验收明细见 [`ADMIN-STAGE2-REQUIREMENTS.md`](./ADMIN-STAGE2-REQUIREMENTS.md) §8 |
