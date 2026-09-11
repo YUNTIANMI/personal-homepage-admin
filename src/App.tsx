@@ -3,9 +3,12 @@ import { ProtectedRoute } from './auth/ProtectedRoute'
 import { AdminLayout } from './components/AdminLayout'
 import { LoginPage } from './pages/LoginPage'
 import { PublicSite } from './pages/PublicSite'
+import { AssetsPage } from './pages/admin/AssetsPage'
 import { DashboardPage } from './pages/admin/DashboardPage'
 import { PostListPage } from './pages/admin/PostListPage'
+import { ProfilePage } from './pages/admin/ProfilePage'
 import { ProjectListPage } from './pages/admin/ProjectListPage'
+import { SettingsPage } from './pages/admin/SettingsPage'
 
 /**
  * 一个应用，两个区域：
@@ -31,6 +34,9 @@ export default function App() {
           <Route index element={<DashboardPage />} />
           <Route path="posts" element={<PostListPage />} />
           <Route path="projects" element={<ProjectListPage />} />
+          <Route path="assets" element={<AssetsPage />} />
+          <Route path="profile" element={<ProfilePage />} />
+          <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Route>
 

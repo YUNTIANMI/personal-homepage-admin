@@ -5,14 +5,16 @@ import {
   CloudOff,
   FileText,
   FolderKanban,
+  Images,
   LayoutDashboard,
   Loader2,
   LogOut,
   Menu,
   Moon,
   RefreshCw,
+  Settings,
   Sun,
-  X,
+  UserRound,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { useStore } from '../store'
@@ -26,6 +28,9 @@ const NAV: Array<{ to: string; label: string; icon: typeof FileText; end?: boole
   { to: '/admin', label: '仪表盘', icon: LayoutDashboard, end: true },
   { to: '/admin/posts', label: '文章管理', icon: FileText },
   { to: '/admin/projects', label: '项目管理', icon: FolderKanban },
+  { to: '/admin/assets', label: '媒体库', icon: Images },
+  { to: '/admin/profile', label: '站点配置', icon: UserRound },
+  { to: '/admin/settings', label: '设置', icon: Settings },
 ]
 
 /** 顶栏云端同步状态徽标 */
