@@ -8,7 +8,7 @@
 | 文档状态 | **阶段一已交付并验收**（阶段二待启动） |
 | 目标产物 | 单应用双区域：`/` 对外展示站点（只读）+ `/admin` 后台管理 |
 | 需求来源 | [`docs/ADMIN-PANEL-HANDOFF.md`](./ADMIN-PANEL-HANDOFF.md)（技术事实基线） |
-| 关联文档 | [`README.md`](../README.md) · [`docs/REQUIREMENTS.md`](./REQUIREMENTS.md)（源项目原始需求） |
+| 关联文档 | [`README.md`](../README.md) · [`docs/REQUIREMENTS.md`](./REQUIREMENTS.md)（源项目原始需求） · [`docs/ADMIN-STAGE2-REQUIREMENTS.md`](./ADMIN-STAGE2-REQUIREMENTS.md)（阶段二需求与技术选型） |
 
 > **v1.1 变更说明**
 >
