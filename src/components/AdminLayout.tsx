@@ -128,7 +128,7 @@ export function AdminLayout() {
       </nav>
 
       <div className="shrink-0 border-t border-line px-5 py-4">
-        <p className="font-mono text-[0.6875rem] text-ink-faint">v0.1.0 · 阶段一</p>
+        <p className="font-mono text-[0.6875rem] text-ink-faint">v0.2.0</p>
       </div>
     </>
   )
