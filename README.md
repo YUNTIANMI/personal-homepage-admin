@@ -14,7 +14,7 @@
 | --- | --- | --- | --- |
 | 展示站点 | `/` | 任何人，无需登录 | 首页 / 博客 / 项目 / 关于，**页内切换**（不改地址栏） |
 | 登录 | `/login` | 管理员 | 邮箱 + 密码 |
-| 后台管理 | `/admin`、`/admin/posts`、`/admin/projects` | 管理员（登录后） | 仪表盘 / 文章管理 / 项目管理 |
+| 后台管理 | `/admin` 及其子路由 | 管理员（登录后） | 仪表盘 / 文章管理 / 项目管理 / 媒体库 / 站点配置 / 设置 |
 
 - 展示站点**不含任何新增 / 编辑 / 删除入口**，也不含任何写入云端的逻辑；
 - 未登录访问 `/admin/*` 会重定向到 `/login`，登录后跳回原页面；
@@ -31,7 +31,13 @@
 - 项目管理（增删改查、外链校验）；
 - 展示站点只读化（访客可浏览，不能修改）。
 
-**阶段二计划**：草稿 / 发布状态、图片上传（Supabase Storage）、站点配置可视化编辑、数据导入导出。
+✅ **阶段二已完成**（范围经确认为 S2.2 / S2.3 / S2.4）：
+
+- **媒体能力**：图片上传（Supabase Storage）、编辑器插入图片（按钮 / 拖拽 / 粘贴）、媒体库（浏览 / 复制链接 / 删除）；
+- **站点配置**：站点资料存云端 `site_profile`，后台可视化编辑并实时预览，展示站点读取云端值（含默认值兜底）；
+- **运维能力**：数据导入导出（JSON，导入含差异预览）、修改密码（需验证当前密码）。
+
+> 未做项（经确认）：草稿 / 发布状态、置顶排序、文章可分享直链、操作日志、回收站。
 
 ## 三、技术栈
 
@@ -87,6 +93,8 @@ VITE_SUPABASE_ANON_KEY=<publishable / anon key>
 | --- | --- |
 | `supabase/migrations/0001_stage1_admin_base.sql` | 新增 `created_at` / `updated_at` 与索引；建立 `updated_at` 触发器；RLS 收紧为「anon 只读 + authenticated 可写」 |
 | `supabase/migrations/0002_stage1_session_validity.sql` | 新增 `is_admin_session_valid()` 函数，写策略要求「会话未超过有效期（默认 7 天）」 |
+| `supabase/migrations/0004_stage2_site_profile.sql` | 新建 `site_profile` 单行表 + RLS + 初始化默认值（站点配置云端化） |
+| `supabase/migrations/0005_stage2_storage_assets.sql` | 创建 `assets` bucket（public / 5MB / 图片类型）+ Storage 策略（上传删除需会话有效） |
 
 ### 6.3 权限模型
 
@@ -122,19 +130,23 @@ src/
 ├── auth/                       AuthProvider（会话与有效期）· ProtectedRoute（路由守卫）
 ├── components/                 AdminLayout · Header（展示站顶栏/页脚）· Dialog · TagInput ·
 │                               LinkRowsEditor · ui（设计系统组件）· icons
-├── lib/                        cloud.ts（Supabase 数据与鉴权）· markdown.tsx · site.ts
+├── lib/                        cloud.ts（Supabase 数据与鉴权）· storage.ts（媒体上传）·
+│                               markdown.tsx · site.ts（默认值 + 云端合并）
 └── pages/
     ├── PublicSite.tsx          展示站点外壳（页内切换）
     ├── HomePage / BlogPage / PostReader / ProjectsPage / AboutPage   展示页（只读）
     ├── LoginPage.tsx           登录页
     ├── PostFormDialog / ProjectFormDialog                            后台表单
-    └── admin/                  DashboardPage · PostListPage · ProjectListPage
+    └── admin/                  DashboardPage · PostListPage · ProjectListPage ·
+                                AssetsPage（媒体库）· ProfilePage（站点配置）· SettingsPage（导入导出 / 改密码）
 supabase/migrations/            数据库迁移脚本
 docs/                           需求与交接文档
 .github/workflows/              Supabase 保活工作流
 ```
 
 ## 九、部署
+
+> **首次部署顺序**：先在 Supabase SQL Editor 依次执行 `0001` → `0002` → `0004` → `0005`（均幂等），再部署前端。
 
 - 构建产物是纯静态文件，可部署到任意静态托管（Vercel / Cloudflare Pages 等）；
 - 展示区为**页内切换**，因此**不需要配置任何 rewrite 规则**；
