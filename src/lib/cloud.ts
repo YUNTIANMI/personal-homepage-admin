@@ -111,19 +111,6 @@ export function onAuthStateChange(cb: (session: Session | null) => void): () => 
   return () => data.subscription.unsubscribe()
 }
 
-/** 判断错误是否为「会话失效 / 未认证」（RLS 收紧后写入被拒时会出现） */
-export function isAuthError(err: unknown): boolean {
-  const status = (err as { status?: number } | null)?.status
-  if (status === 401 || status === 403) return true
-  const message = err instanceof Error ? err.message.toLowerCase() : ''
-  return (
-    message.includes('jwt') ||
-    message.includes('unauthorized') ||
-    message.includes('not authenticated') ||
-    message.includes('row-level security')
-  )
-}
-
 /* ---------------- 会话有效期（服务端权威校验） ---------------- */
 
 /** 服务端会话校验结果：有效 / 已失效 / 无法判定（未部署校验函数或网络异常） */

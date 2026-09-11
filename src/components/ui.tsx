@@ -170,29 +170,6 @@ export function Chip({
   )
 }
 
-/* ---------------- Checkbox ---------------- */
-export function Checkbox({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean
-  onChange: (v: boolean) => void
-  label?: string
-}) {
-  return (
-    <label className="focus-ring flex cursor-pointer items-center gap-2 rounded">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="size-4 accent-brand"
-      />
-      {label && <span className="select-none text-[15px] text-ink-soft">{label}</span>}
-    </label>
-  )
-}
-
 /* ---------------- 空态 ---------------- */
 export function EmptyState({
   icon,
