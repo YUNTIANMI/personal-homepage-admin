@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { Check, Copy, Mail, UserRound } from 'lucide-react'
 import { Chip, PageHead } from '../components/ui'
 import { GithubIcon } from '../components/icons'
-import { SITE } from '../lib/site'
+import { useStore } from '../store'
 import { useToast } from '../toast'
 
 export function AboutPage() {
+  const { site } = useStore()
   const toast = useToast()
   const [copied, setCopied] = useState(false)
 
@@ -33,7 +34,7 @@ export function AboutPage() {
    * 不 await 剪贴板结果，点击后立即给出反馈（避免个别环境权限挂起导致无响应）。
    */
   const copyEmail = () => {
-    const text = SITE.email
+    const text = site.email
     if (!text) return
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(text).catch(() => legacyCopy(text))
@@ -57,7 +58,7 @@ export function AboutPage() {
             <h2 className="text-xl font-bold text-ink">自我介绍</h2>
           </div>
           <div className="max-w-4xl">
-            <p className="mt-4 text-[1.0625rem] leading-relaxed text-ink-soft">{SITE.intro}</p>
+            <p className="mt-4 text-[1.0625rem] leading-relaxed text-ink-soft">{site.intro}</p>
             <p className="mt-3 text-[1.0625rem] leading-relaxed text-ink-soft">
               本站内容围绕软件工程展开：上方「博客」沉淀技术文章，使用 Markdown 编写并实时渲染；
               「项目」集中展示做过的软件作品，均可点击跳转到 GitHub 等外部地址。
@@ -71,7 +72,7 @@ export function AboutPage() {
             <h2 className="text-xl font-bold text-ink">技能栈</h2>
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
-            {SITE.tech.map((t) => (
+            {site.tech.map((t) => (
               <Chip key={t} tone="brand">
                 {t}
               </Chip>
@@ -86,9 +87,9 @@ export function AboutPage() {
             关于技术交流、项目合作或内推机会，欢迎通过以下渠道联系：
           </p>
           <div className="mt-5 flex flex-wrap gap-2.5">
-            {SITE.github && (
+            {site.github && (
               <a
-                href={SITE.github}
+                href={site.github}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line-strong px-5 py-2.5 text-[15px] font-medium text-ink transition-colors hover:border-brand hover:text-brand"
@@ -96,15 +97,15 @@ export function AboutPage() {
                 <GithubIcon size={17} /> GitHub
               </a>
             )}
-            {SITE.email && (
+            {site.email && (
               <button
                 type="button"
                 onClick={copyEmail}
                 title="点击复制邮箱"
-                aria-label={`复制邮箱 ${SITE.email}`}
+                aria-label={`复制邮箱 ${site.email}`}
                 className="focus-ring group inline-flex items-center gap-2 rounded-lg border border-line-strong px-5 py-2.5 text-[15px] font-medium text-ink transition-colors hover:border-brand hover:text-brand"
               >
-                <Mail size={17} /> {SITE.email}
+                <Mail size={17} /> {site.email}
                 {copied ? (
                   <Check size={15} className="text-ok" aria-hidden="true" />
                 ) : (

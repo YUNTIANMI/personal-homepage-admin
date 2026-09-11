@@ -7,7 +7,7 @@
  * - 表结构见 README「云端存储」章节：posts / projects，列名与前端字段一一对应。
  */
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js'
-import type { Post, Project } from '../types'
+import type { Post, Project, SiteProfile } from '../types'
 
 const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL ?? '').trim()
 const SUPABASE_ANON_KEY = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim()
@@ -22,6 +22,9 @@ export const COLLECTIONS = {
 } as const
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS]
+
+/** 站点配置表名（单行表，结构与列表业务数据不同，单独处理） */
+const SITE_PROFILE_TABLE = 'site_profile'
 
 let client: SupabaseClient | null = null
 
@@ -44,18 +47,28 @@ export function getClient(): SupabaseClient {
   return client
 }
 
-/** 拉取云端全部文章与项目 */
-export async function fetchAllData(): Promise<{ posts: Post[]; projects: Project[] }> {
+/** 拉取云端全部数据（文章、项目、站点配置） */
+export async function fetchAllData(): Promise<{
+  posts: Post[]
+  projects: Project[]
+  site: SiteProfile | null
+}> {
   const supabase = getClient()
-  const [postsRes, projectsRes] = await Promise.all([
+  const [postsRes, projectsRes, siteRes] = await Promise.all([
     supabase.from(COLLECTIONS.posts).select('*'),
     supabase.from(COLLECTIONS.projects).select('*'),
+    supabase.from(SITE_PROFILE_TABLE).select('*').limit(1).maybeSingle(),
   ])
   if (postsRes.error) throw postsRes.error
   if (projectsRes.error) throw projectsRes.error
+  if (siteRes.error) {
+    // 站点配置表可能尚未创建（迁移未执行）：降级为本地默认值，不影响展示
+    console.warn('[cloud] 读取站点配置失败，将使用本地默认值：', siteRes.error)
+  }
   return {
     posts: (postsRes.data ?? []) as Post[],
     projects: (projectsRes.data ?? []) as Project[],
+    site: siteRes.error ? null : ((siteRes.data as SiteProfile | null) ?? null),
   }
 }
 
@@ -71,6 +84,29 @@ export async function upsertDoc(collection: CollectionName, doc: Post | Project)
 export async function removeDocs(collection: CollectionName, ids: string[]): Promise<void> {
   if (ids.length === 0) return
   const { error } = await getClient().from(collection).delete().in('id', ids)
+  if (error) throw error
+}
+
+/** 批量写入（导入用）：按 id upsert，分片提交避免单请求过大 */
+export async function upsertDocs(
+  collection: CollectionName,
+  docs: Array<Post | Project>,
+  chunkSize = 100,
+): Promise<void> {
+  if (docs.length === 0) return
+  const supabase = getClient()
+  for (let i = 0; i < docs.length; i += chunkSize) {
+    const chunk = docs.slice(i, i + chunkSize)
+    const { error } = await supabase.from(collection).upsert(chunk, { onConflict: 'id' })
+    if (error) throw error
+  }
+}
+
+/** 保存站点配置（单行表 upsert） */
+export async function upsertSiteProfile(profile: SiteProfile): Promise<void> {
+  const { error } = await getClient()
+    .from(SITE_PROFILE_TABLE)
+    .upsert({ id: 'default', ...profile }, { onConflict: 'id' })
   if (error) throw error
 }
 

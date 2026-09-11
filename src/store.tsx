@@ -8,7 +8,8 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { Post, Project } from './types'
+import type { Post, Project, SiteProfile } from './types'
+import { mergeSite } from './lib/site'
 import { todayISO } from './utils'
 import {
   COLLECTIONS,
@@ -16,6 +17,7 @@ import {
   fetchAllData,
   removeDocs,
   upsertDoc,
+  upsertSiteProfile,
 } from './lib/cloud'
 
 /**
@@ -95,6 +97,8 @@ export function greet(person: Engineer): string {
 export interface State {
   posts: Post[]
   projects: Project[]
+  /** 站点基础资料（云端值与本地默认值合并后的结果，永不为空） */
+  site: SiteProfile
 }
 
 export type Action =
@@ -104,8 +108,10 @@ export type Action =
   | { type: 'project/add'; project: Project }
   | { type: 'project/update'; project: Project }
   | { type: 'project/delete'; ids: string[] }
+  /** 保存站点配置 */
+  | { type: 'site/save'; site: SiteProfile }
   /** 用云端返回的数据整体替换（初始化拉取时使用，不触发回写） */
-  | { type: 'state/replace'; posts: Post[]; projects: Project[] }
+  | { type: 'state/replace'; posts: Post[]; projects: Project[]; site: SiteProfile }
 
 /** 数据来源状态：本地模式 / 云端加载中 / 已同步 / 同步失败 */
 export type SyncStatus = 'local' | 'loading' | 'synced' | 'error'
@@ -120,7 +126,7 @@ function readLocalCache(): State | null {
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<State>
       if (Array.isArray(parsed.posts) && Array.isArray(parsed.projects)) {
-        return { posts: parsed.posts, projects: parsed.projects }
+        return { posts: parsed.posts, projects: parsed.projects, site: mergeSite(parsed.site) }
       }
     }
   } catch {
@@ -138,7 +144,11 @@ function readLocalCache(): State | null {
 function loadState(): State {
   const cached = readLocalCache()
   if (cached) return cached
-  return cloudEnabled ? { posts: [], projects: [] } : { posts: buildSeedPosts(), projects: [] }
+  return {
+    posts: cloudEnabled ? [] : buildSeedPosts(),
+    projects: [],
+    site: mergeSite(null),
+  }
 }
 
 /**
@@ -188,6 +198,8 @@ function syncToCloud(action: Action): Promise<void>[] {
       return [removeDocs(COLLECTIONS.posts, action.ids)]
     case 'project/delete':
       return [removeDocs(COLLECTIONS.projects, action.ids)]
+    case 'site/save':
+      return [upsertSiteProfile(action.site)]
     default:
       return []
   }
@@ -219,8 +231,10 @@ function reducer(state: State, action: Action): State {
       }
     case 'project/delete':
       return { ...state, projects: state.projects.filter((p) => !action.ids.includes(p.id)) }
+    case 'site/save':
+      return { ...state, site: action.site }
     case 'state/replace':
-      return { posts: action.posts, projects: action.projects }
+      return { posts: action.posts, projects: action.projects, site: action.site }
     default:
       return state
   }
@@ -229,6 +243,8 @@ function reducer(state: State, action: Action): State {
 interface StoreValue {
   posts: Post[]
   projects: Project[]
+  /** 站点基础资料（展示站点与后台共用，永不为空） */
+  site: SiteProfile
   /** 派发操作：本地立即生效；返回的 Promise 在云端写入成功时 resolve、失败时 reject */
   dispatch: (action: Action) => Promise<void>
   /** 是否启用了云端存储 */
@@ -266,7 +282,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // 注意：这里不再做「本地数据迁移上传」。
         // 展示站点对所有访客开放，任何隐式写入都会被 RLS 拒绝并污染同步状态；
         // 内容写入只允许在后台（登录态）显式发生。
-        dispatchBase({ type: 'state/replace', posts: remote.posts, projects: remote.projects })
+        dispatchBase({
+          type: 'state/replace',
+          posts: remote.posts,
+          projects: remote.projects,
+          site: mergeSite(remote.site),
+        })
         setSyncStatus('synced')
       } catch (err) {
         console.error('[cloud] 读取云端数据失败：', err)
@@ -301,7 +322,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setSyncStatus('loading')
     try {
       const remote = await fetchAllData()
-      dispatchBase({ type: 'state/replace', posts: remote.posts, projects: remote.projects })
+      dispatchBase({
+        type: 'state/replace',
+        posts: remote.posts,
+        projects: remote.projects,
+        site: mergeSite(remote.site),
+      })
       setSyncStatus('synced')
     } catch (err) {
       console.error('[cloud] 重新拉取云端数据失败：', err)

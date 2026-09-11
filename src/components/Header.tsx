@@ -1,6 +1,5 @@
 import { Moon, Sun } from 'lucide-react'
 import type { View } from '../types'
-import { SITE } from '../lib/site'
 import { useStore } from '../store'
 import { BrandLogo } from './icons'
 import { cn } from './ui'
@@ -23,6 +22,8 @@ export function Header({
   theme: 'light' | 'dark'
   onToggleTheme: () => void
 }) {
+  const { site } = useStore()
+
   return (
     <header className="sticky top-0 z-50 border-b border-line/80 bg-canvas/85 backdrop-blur-md">
       {/* 与主内容对齐的流体内层，无宽度锁 */}
@@ -37,9 +38,9 @@ export function Header({
           >
             <BrandLogo size={32} />
             <span className="flex flex-col items-start leading-none">
-              <span className="text-base font-bold tracking-tight text-ink">{SITE.name}</span>
+              <span className="text-base font-bold tracking-tight text-ink">{site.name}</span>
               <span className="mt-1 font-mono text-xs tracking-[0.3em] text-ink-faint">
-                {SITE.en}
+                {site.en}
               </span>
             </span>
           </button>
@@ -112,7 +113,7 @@ export function Header({
 }
 
 export function Footer() {
-  const { cloudEnabled, syncStatus } = useStore()
+  const { cloudEnabled, syncStatus, site } = useStore()
 
   // 数据存储状态提示（便于确认数据到底存在哪）
   const storageLabel = !cloudEnabled
@@ -127,7 +128,7 @@ export function Footer() {
     <footer className="mt-16 border-t border-line/80">
       <div className="flex w-full flex-col items-center justify-between gap-2 px-4 py-7 text-sm text-ink-faint sm:flex-row sm:px-6 lg:px-8 xl:px-10">
         <p>
-          © {SITE.startYear} {SITE.name} · {SITE.role}
+          © {site.startYear} {site.name} · {site.role}
         </p>
         <p className="flex items-center gap-2 font-mono">
           {cloudEnabled && (

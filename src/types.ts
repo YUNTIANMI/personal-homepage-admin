@@ -39,3 +39,18 @@ export interface Project {
 
 /** 对外展示站点的视图（展示部分沿用页内切换，不改地址栏） */
 export type View = 'home' | 'blog' | 'read' | 'projects' | 'about'
+
+/** 站点基础资料（云端 site_profile 单行表，展示站点与后台共用） */
+export interface SiteProfile {
+  name: string
+  en: string
+  role: string
+  headline: string
+  intro: string
+  /** 留空表示不展示 */
+  github: string
+  /** 留空表示不展示 */
+  email: string
+  tech: string[]
+  startYear: number
+}
