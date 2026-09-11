@@ -184,9 +184,10 @@ docs/                           需求与交接文档
 | `docs/ADMIN-REQUIREMENTS.md` | 后台开发需求（功能编号、验收标准、风险清单） |
 | `docs/REQUIREMENTS.md` | 前台站点原始需求 |
 | `docs/ADMIN-STAGE2-REQUIREMENTS.md` | 阶段二开发文档（需求 + 技术选型） |
-| `docs/BACKEND-REQUIREMENTS.md` | **后端改造需求**（Java + Spring Boot 版：功能只增不减，新增 8 项后端向能力） |
-| `docs/BACKEND-ARCHITECTURE.md` | **后端技术架构**（选型理由、分层、9 项关键机制、12 张表 DDL、接口契约） |
-| `docs/BACKEND-PLAN.md` | **后端开发计划**（M0～M6 里程碑、时间档位、答辩演示脚本、砍需求顺序） |
+| `docs/BACKEND-REQUIREMENTS.md` | **后端改造需求**（Java + Spring Boot 版：功能只增不减，新增 8 项后端向能力，「最小但完备」判定标准） |
+| `docs/BACKEND-ARCHITECTURE.md` | **后端技术架构**（选型理由、分层、9 项关键机制、12 张表 DDL、接口契约、技术点↔需求映射） |
+| `docs/BACKEND-DEVELOPMENT.md` | **后端开发文档**（6 个阶段：每阶段的目标 / 覆盖需求 / 使用技术 / 关键产出 / 完成标准，38 条需求全覆盖） |
+| `docs/BACKEND-PLAN.md` | **后端排期与交付**（工期档位、答辩演示脚本、砍需求顺序、风险与交付物） |
 
 ## License
 

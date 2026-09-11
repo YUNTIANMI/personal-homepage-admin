@@ -2,10 +2,10 @@
 
 | 项 | 内容 |
 | --- | --- |
-| 文档版本 | v1.0 |
+| 文档版本 | v1.1 |
 | 撰写日期 | 2026-09-11 |
 | 适用范围 | 后端改造的技术选型、分层、关键机制、数据库与接口契约 |
-| 关联文档 | [`BACKEND-REQUIREMENTS.md`](./BACKEND-REQUIREMENTS.md)（需求）· [`BACKEND-PLAN.md`](./BACKEND-PLAN.md)（计划） |
+| 关联文档 | [`BACKEND-REQUIREMENTS.md`](./BACKEND-REQUIREMENTS.md)（需求）· [`BACKEND-DEVELOPMENT.md`](./BACKEND-DEVELOPMENT.md)（分阶段开发）· [`BACKEND-PLAN.md`](./BACKEND-PLAN.md)（排期与交付） |
 | 设计原则 | **单体分层 + 常规做法优先**。每个技术选择都要能一句话讲清理由，不做炫技式选型 |
 
 ---
@@ -43,6 +43,33 @@
 | 消息队列 | 本项目没有异步解耦场景，硬加会被追问「为什么需要 MQ」 |
 | Sa-Token 等轻量鉴权库 | 上手快但绕过了 Spring Security 的过滤链，**面试考点丢失** |
 | 自研文件存储服务 | 用本地磁盘 + `StorageService` 接口抽象即可，保留替换 OSS 的扩展点 |
+
+### 1.3 技术点 ↔ 需求映射
+
+> 每个技术点都必须能对应到 §4/§5 的具体需求，避免出现「引了却没用」的假完备（见需求文档 §2.4.3）。
+
+| 技术点 | 主要满足的需求编号 | 详见 |
+| --- | --- | --- |
+| Spring Boot 分层（Controller / Service / Mapper） | 全部 FR（架构底座） | §3 |
+| `Result` + `ErrorCode` + `GlobalExceptionHandler` | 全部接口的错误返回约定 | §4.1 |
+| Jakarta Validation（`@Valid`） | FR-B-P05、FR-B-J03、FR-B-S02 | §4.2 |
+| Spring Security + JWT 双 token | FR-B-A01、A02、A03 | §4.3 |
+| Redis token 黑名单 | FR-B-A04 | §4.3 |
+| `token_version` 自增吊销 | FR-B-A05 | §4.3 |
+| 登录失败计数 + 锁定（Redis） | FR-B-A06、A07 | §4.10 |
+| 角色 + `@PreAuthorize` | FR-B-A08 | §4.3 |
+| MyBatis-Plus 分页插件 | FR-B-P01、FR-B-J01、FR-B-U03、FR-B-T02 | §4.5 |
+| **乐观锁 `@Version`** | **FR-B-P06** | §4.4 |
+| `@TableLogic` 逻辑删除 | FR-B-P10、FR-B-P11、FR-B-J04 | §4.5 |
+| `MetaObjectHandler` 自动填充 | 全部含时间戳的表 | §4.5 |
+| **状态机 + `@Transactional`** | **FR-B-P07、FR-B-P08** | §4.6、§4.7 |
+| 多对多关联（`post_tag`） | FR-B-P04 | §5.2 |
+| `@OperationLog` + AOP 审计 | FR-B-T01、FR-B-T02 | §4.8 |
+| Spring Cache + Redis | FR-B-S03、FR-B-P12 | §4.9 |
+| `StorageService` 存储抽象 | FR-B-U01 ～ U04 | §3 |
+| springdoc-openapi | 全部接口（文档化） | §7 |
+| Flyway | 12 张表的版本管理 | §5 |
+| Docker Compose + GitHub Actions | 交付与部署 | §8 |
 
 ---
 
@@ -655,3 +682,4 @@ CREATE TABLE login_log (
 | 版本 | 日期 | 变更 |
 | --- | --- | --- |
 | v1.0 | 2026-09-11 | 初版：技术选型（含否决理由）、单体分层架构、9 项关键机制、12 张表 DDL 与索引说明、接口契约、工程规范与部署架构 |
+| v1.1 | 2026-09-11 | 新增 **§1.3 技术点 ↔ 需求映射**，确保每个技术点都对应到具体 `FR-B-*` 需求；关联文档补入开发文档 |
