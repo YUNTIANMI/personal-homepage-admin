@@ -11,7 +11,7 @@ export function cn(...xs: Array<string | false | undefined>): string {
 }
 
 /* ---------------- Button ---------------- */
-type BtnVariant = 'primary' | 'outline' | 'ghost' | 'danger' | 'danger-ghost' | 'brand-ghost'
+type BtnVariant = 'primary' | 'outline' | 'ghost' | 'danger-ghost'
 type BtnSize = 'sm' | 'md'
 
 const variantCls: Record<BtnVariant, string> = {
@@ -20,8 +20,6 @@ const variantCls: Record<BtnVariant, string> = {
   outline:
     'border border-line-strong bg-surface text-ink hover:border-brand hover:text-brand disabled:hover:border-line-strong disabled:hover:text-ink',
   ghost: 'text-ink-soft hover:bg-canvas-soft hover:text-ink',
-  'brand-ghost': 'text-brand hover:bg-brand-soft',
-  danger: 'bg-danger text-white shadow-sm hover:opacity-90',
   'danger-ghost': 'text-danger hover:bg-danger-soft',
 }
 
@@ -30,7 +28,7 @@ const sizeCls: Record<BtnSize, string> = {
   md: 'h-12 gap-2 px-6 text-[0.9375rem]',
 }
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: BtnVariant
   size?: BtnSize
 }

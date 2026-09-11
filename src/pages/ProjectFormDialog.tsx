@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { ExternalLink } from 'lucide-react'
 import type { Project, ProjectLink } from '../types'
 import { Dialog } from '../components/Dialog'
 import { LinkRowsEditor } from '../components/LinkRowsEditor'

@@ -7,13 +7,13 @@
 import { uid } from '../utils'
 import { getClient } from './cloud'
 
-export const ASSETS_BUCKET = 'assets'
+const ASSETS_BUCKET = 'assets'
 
 /** 单文件上限（与 bucket 设置保持一致） */
-export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
 /** 允许的图片类型（与 bucket 的 allowed_mime_types 保持一致） */
-export const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
 
 export interface AssetItem {
   name: string
@@ -26,12 +26,12 @@ export interface AssetItem {
 }
 
 /** 由对象路径取公开 URL */
-export function publicUrl(path: string): string {
+function publicUrl(path: string): string {
   return getClient().storage.from(ASSETS_BUCKET).getPublicUrl(path).data.publicUrl
 }
 
 /** 上传前校验；不通过时返回原因文案 */
-export function validateImage(file: File): string | null {
+function validateImage(file: File): string | null {
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) return '仅支持 PNG / JPG / WebP / GIF 图片'
   if (file.size > MAX_UPLOAD_BYTES) {
     return `图片不能超过 ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)}MB`

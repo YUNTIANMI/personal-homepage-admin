@@ -37,7 +37,7 @@ export function isValidHttpUrl(value: string): boolean {
  * 只删除标记语法、保留可见文案：图片留 alt、链接留可见文字并丢弃地址；
  * 代码块与行内代码整段丢弃（与阅读时长的统计口径一致）。
  */
-export function markdownToPlainText(markdown: string): string {
+function markdownToPlainText(markdown: string): string {
   return (markdown || '')
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`[^`\n]*`/g, ' ')

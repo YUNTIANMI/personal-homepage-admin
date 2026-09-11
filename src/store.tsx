@@ -29,7 +29,7 @@ import {
  */
 
 /** 内置示例文章的 id（示例仅 1 条，标注「示例 · 可删除」） */
-export const SAMPLE_POST_ID = 'sample-welcome'
+const SAMPLE_POST_ID = 'sample-welcome'
 
 function buildSeedPosts(): Post[] {
   return [
@@ -94,7 +94,7 @@ export function greet(person: Engineer): string {
   ]
 }
 
-export interface State {
+interface State {
   posts: Post[]
   projects: Project[]
   /** 站点基础资料（云端值与本地默认值合并后的结果，永不为空） */
@@ -114,7 +114,7 @@ export type Action =
   | { type: 'state/replace'; posts: Post[]; projects: Project[]; site: SiteProfile }
 
 /** 数据来源状态：本地模式 / 云端加载中 / 已同步 / 同步失败 */
-export type SyncStatus = 'local' | 'loading' | 'synced' | 'error'
+type SyncStatus = 'local' | 'loading' | 'synced' | 'error'
 
 /** 本地缓存键（保持原键名不变，避免老用户已有数据丢失） */
 const STORAGE_KEY = 'luoji.store.v1'
