@@ -4,6 +4,7 @@
  * - 读取公开：展示站点直接引用公开 URL，无需鉴权；
  * - 上传 / 删除仅限【已登录且会话未过期】的管理员，由数据库侧 Storage 策略强制。
  */
+import { uid } from '../utils'
 import { getClient } from './cloud'
 
 export const ASSETS_BUCKET = 'assets'
@@ -57,7 +58,9 @@ export async function uploadImage(file: File): Promise<{ path: string; url: stri
 
   const now = new Date()
   const dir = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`
-  const path = `${dir}/${crypto.randomUUID()}.${extOf(file)}`
+  // 用 uid() 而非直接调用 crypto.randomUUID：后者只在安全上下文（HTTPS / localhost）可用，
+  // 通过局域网 IP 等地址访问时会抛 “crypto.randomUUID is not a function”。
+  const path = `${dir}/${uid()}.${extOf(file)}`
 
   const { error } = await getClient()
     .storage.from(ASSETS_BUCKET)
