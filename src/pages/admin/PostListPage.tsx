@@ -21,6 +21,7 @@ import { PostFormDialog } from '../PostFormDialog'
 import { useStore } from '../../store'
 import { useToast } from '../../toast'
 import type { Post } from '../../types'
+import { excerptOf } from '../../utils'
 
 const PAGE_SIZE = 10
 
@@ -50,12 +51,6 @@ function HeaderCheckbox({
       className="size-4 accent-brand"
     />
   )
-}
-
-/** 摘要：优先用 description，留空则截取正文开头 */
-function summaryOf(post: Post): string {
-  if (post.description?.trim()) return post.description.trim()
-  return (post.content ?? '').replace(/[#>*`_\-|~[\]()]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90)
 }
 
 /** 把 'yyyy-mm-dd' 或 ISO 时间串统一成可比较的毫秒数（无法解析返回 0） */
@@ -329,7 +324,7 @@ export function PostListPage() {
                         )}
                       </td>
                       <td className="px-4 py-3.5 text-ink-soft">
-                        <span className="line-clamp-2">{summaryOf(post) || '—'}</span>
+                        <span className="line-clamp-2">{excerptOf(post) || '—'}</span>
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center justify-end gap-0.5">

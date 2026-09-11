@@ -3,7 +3,7 @@ import { BookOpen, FileText, Search, X } from 'lucide-react'
 import type { Post } from '../types'
 import { Button, Chip, EmptyState, IconBtn, PageHead } from '../components/ui'
 import { useStore } from '../store'
-import { fmtDate } from '../utils'
+import { excerptOf, fmtDate } from '../utils'
 
 /** 博客列表（展示站点）：只读，搜索 + 阅读；内容统一在后台 /admin 发布 */
 export function BlogPage({ onRead }: { onRead: (p: Post) => void }) {
@@ -97,8 +97,7 @@ export function BlogPage({ onRead }: { onRead: (p: Post) => void }) {
                     )}
                   </div>
                   <p className="mt-2 line-clamp-2 text-[0.9375rem] leading-relaxed text-ink-soft">
-                    {post.description ||
-                      (post.content.replace(/[#>*`_\-]/g, '').slice(0, 90) + '…')}
+                    {excerptOf(post) || '—'}
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-1.5">
                     <span className="mr-1 font-mono text-xs text-ink-faint">
