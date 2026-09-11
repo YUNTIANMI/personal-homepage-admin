@@ -90,6 +90,9 @@
   --font-mono:
     'JetBrains Mono', 'Cascadia Code', 'SF Mono', Consolas, 'Courier New', ui-monospace,
     monospace;
+  /* 字号 token：跟随根字号阶梯（用 rem），让 text-xs/text-sm 也能随视口阶梯放大 */
+  --text-xs: 0.8125rem; /* ~15px @1366+，原本 12px 太小 */
+  --text-sm: 0.9375rem; /* ~17px @1366+，原本 14px 偏小 */
 }
 
 @layer base {
@@ -100,34 +103,33 @@
     text-size-adjust: 100%;
   }
   /* 根字号随视口宽度阶梯放大：所有 rem 单位的字号与间距同步变大。
-     100% 起步以尊重浏览器/系统的默认字号偏好；1366/1440 常见的
-     办公屏也尽早吃到放大档，不再只照顾 1920 大屏。 */
+     起步 112.5%（18px），让中文在小屏就够看；大屏逐档继续放大。 */
   :root {
-    font-size: 100%;
+    font-size: 112.5%; /* 18px */
   }
   @media (min-width: 1024px) {
-    :root {
-      font-size: 106.25%; /* 17px */
-    }
-  }
-  @media (min-width: 1366px) {
     :root {
       font-size: 118.75%; /* 19px */
     }
   }
-  @media (min-width: 1536px) {
+  @media (min-width: 1366px) {
     :root {
       font-size: 131.25%; /* 21px */
     }
   }
+  @media (min-width: 1536px) {
+    :root {
+      font-size: 143.75%; /* 23px */
+    }
+  }
   @media (min-width: 1920px) {
     :root {
-      font-size: 150%; /* 24px */
+      font-size: 162.5%; /* 26px */
     }
   }
   @media (min-width: 2560px) {
     :root {
-      font-size: 175%; /* 28px */
+      font-size: 187.5%; /* 30px */
     }
   }
   /* 触屏设备点击去蓝框高亮 */
@@ -162,9 +164,10 @@
 /* 输入控件基类（置于 components 层，便于工具类如 pl-9 覆盖） */
 @layer components {
   .input-base {
-    @apply focus-ring w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink transition-colors duration-150 outline-none;
+    @apply focus-ring w-full rounded-lg border border-line bg-surface px-3 py-2 text-[15px] text-ink transition-colors duration-150 outline-none;
     &::placeholder {
       color: var(--ink-faint);
+      font-size: inherit;
     }
     &:hover {
       border-color: var(--line-strong);
