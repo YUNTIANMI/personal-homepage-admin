@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -90,6 +91,22 @@ public class GlobalExceptionHandler {
         log.warn("[请求方法不支持] {}", e.getMethod());
         return ResponseEntity.status(405)
                 .body(Result.fail(ErrorCode.PARAM_INVALID, "请求方法不支持：" + e.getMethod()));
+    }
+
+    /* ---------------- 403 无权限 ---------------- */
+
+    /**
+     * 方法级 {@code @PreAuthorize} 校验失败会抛出 AccessDeniedException。
+     *
+     * <p><b>为什么必须单独处理</b>：该异常在 DispatcherServlet 内被抛出，
+     * 若不显式处理，会被下面的 {@code Exception.class} 兜底误判为「服务器内部错误」返回 500。
+     * 这里拦截并正确映射为 403。
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Result<Void>> handleAccessDenied(AccessDeniedException e) {
+        log.warn("[无权限] {}", e.getMessage());
+        return ResponseEntity.status(ErrorCode.FORBIDDEN.httpStatus())
+                .body(Result.fail(ErrorCode.FORBIDDEN));
     }
 
     /* ---------------- 兜底：不可预期 ---------------- */

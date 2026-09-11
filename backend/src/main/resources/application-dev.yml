@@ -34,6 +34,10 @@ mybatis-plus:
     # 开发环境打印 SQL，便于调试
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
+jwt:
+  # 仅本地开发使用的密钥（≥ 32 字节）；生产环境必须通过 JWT_SECRET 覆盖
+  secret: ${JWT_SECRET:dev-only-secret-key-please-change-0123456789abcdef0123456789}
+
 logging:
   level:
     com.luoji.blog: debug

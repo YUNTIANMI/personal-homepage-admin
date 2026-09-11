@@ -48,6 +48,12 @@ springdoc:
     tags-sorter: alpha
     operations-sorter: alpha
 
+# JWT：secret 必填（开发默认值见 application-dev.yml；生产必须由 JWT_SECRET 环境变量提供）
+jwt:
+  secret: ${JWT_SECRET:}
+  access-expire-minutes: 30
+  refresh-expire-days: 7
+
 logging:
   pattern:
     console: "%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"
