@@ -7,24 +7,22 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { Session } from '@supabase/supabase-js'
 import {
-  checkSessionValidity,
+  apiLogin,
+  apiLogout,
+  apiMe,
+  clearTokens,
   cloudEnabled,
-  getSession,
-  onAuthStateChange,
-  signInWithPassword,
-  signOut as cloudSignOut,
-} from '../lib/cloud'
+  getAccessToken,
+  type ApiError,
+} from '../lib/api'
+import type { AuthUser } from '../types'
 
 /**
  * 登录态最长有效期：超过后强制重新登录，无论期间是否活跃。
- * 需要调整期限时改这里即可（目前 7 天）。
+ * 与后端 refresh token 的 7 天有效期保持一致（目前 7 天）。
  */
 export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
-
-/** 已登录时每隔多久向服务端复检一次会话有效性（纯 UX；写入时数据库另有强制校验） */
-const SESSION_CHECK_INTERVAL_MS = 5 * 60 * 1000
 
 /** 记录本次登录的起始时间（毫秒时间戳），用于判定是否超过有效期 */
 const SESSION_STARTED_KEY = 'luoji.admin.session.startedAt'
@@ -56,163 +54,110 @@ function clearStartedAt(): void {
   }
 }
 
-/**
- * 取会话的登录起点：
- * 1. 优先用本地记录（登录时写入，最准确）；
- * 2. 缺失时回退到 Supabase 的 last_sign_in_at（老会话 / 换了浏览器）；
- * 3. 都拿不到则视为「现在」开始，避免误判为过期。
- */
-function resolveStartedAt(session: Session): number {
-  const stored = readStartedAt()
-  if (stored) return stored
-
-  const last = session.user?.last_sign_in_at ? new Date(session.user.last_sign_in_at).getTime() : NaN
-  const started = Number.isFinite(last) ? last : Date.now()
-  writeStartedAt(started)
-  return started
-}
-
-function isExpired(startedAt: number): boolean {
-  return Date.now() - startedAt > SESSION_MAX_AGE_MS
-}
-
-/**
- * 综合判断会话是否已失效：
- * 1. 优先问服务端（权威，依据 auth.sessions.created_at，客户端无法伪造）；
- * 2. 服务端不可用（未部署校验函数 / 网络异常）时，退回本地时间戳判断。
- */
-async function isSessionOutdated(session: Session): Promise<boolean> {
-  const server = await checkSessionValidity()
-  if (server === 'valid') return false
-  if (server === 'invalid') return true
-  return isExpired(resolveStartedAt(session))
-}
-
 interface AuthValue {
-  /** 当前会话，未登录为 null */
-  session: Session | null
-  /** 管理员邮箱（未登录为 null） */
-  email: string | null
+  /** 当前登录用户，未登录为 null */
+  user: AuthUser | null
+  /** 登录用户名（未登录为 null） */
+  username: string | null
   /** 会话恢复中（首屏校验登录态） */
   loading: boolean
-  /** 是否配置了 Supabase 环境变量 */
+  /** 是否启用了后端 API */
   cloudEnabled: boolean
   /** 是否因超过登录有效期被强制登出（登录页据此提示） */
   sessionExpired: boolean
-  signIn: (email: string, password: string) => Promise<void>
+  signIn: (username: string, password: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(cloudEnabled)
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [loading, setLoading] = useState(true)
   const [sessionExpired, setSessionExpired] = useState(false)
 
-  /** 超过有效期则强制登出 */
-  const forceExpire = useCallback(async () => {
-    try {
-      await cloudSignOut()
-    } catch (err) {
-      console.error('[auth] 会话过期登出失败：', err)
-    } finally {
-      clearStartedAt()
-      setSession(null)
-      setSessionExpired(true)
-    }
+  /** 清除本地登录态并标记「已过期」 */
+  const forceExpire = useCallback(() => {
+    clearTokens()
+    clearStartedAt()
+    setUser(null)
+    setSessionExpired(true)
   }, [])
 
+  // 首屏：用本地 access token 恢复会话（token 已失效则静默清除）
   useEffect(() => {
-    if (!cloudEnabled) return
-
     let cancelled = false
-
     void (async () => {
       try {
-        const current = await getSession()
-        if (cancelled || !current) return
+        if (!getAccessToken()) return
 
-        if (await isSessionOutdated(current)) {
-          await forceExpire()
+        const started = readStartedAt()
+        if (started && Date.now() - started > SESSION_MAX_AGE_MS) {
+          if (!cancelled) forceExpire()
           return
         }
-        setSession(current)
+
+        const me = await apiMe()
+        if (cancelled) return
+        setUser(me)
       } catch (err) {
-        console.error('[auth] 读取会话失败：', err)
+        // 401 说明 refresh 也失效 → 会话确实过期；网络错误则保持静默
+        const status = (err as ApiError).status
+        if (status === 401) {
+          if (!cancelled) forceExpire()
+        } else {
+          console.error('[auth] 读取当前用户失败：', err)
+          clearTokens()
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
     })()
-
-    // 登录 / 登出 / token 刷新都会触发，保持全局状态同步并复检有效期
-    const unsubscribe = onAuthStateChange((next) => {
-      if (next) {
-        if (isExpired(resolveStartedAt(next))) {
-          void forceExpire()
-          return
-        }
-        setSession(next)
-        return
-      }
-      setSession(null)
-    })
-
     return () => {
       cancelled = true
-      unsubscribe()
     }
   }, [forceExpire])
 
-  // 页面长时间挂着时也要在到期后登出：
-  // - 每分钟用本地时间戳快速判断；
-  // - 每 5 分钟向服务端复检一次（服务端不可用时自动退回本地判断）。
+  // 页面长时间挂着时，每分钟用本地时间戳检查是否超过最长有效期
   useEffect(() => {
-    if (!session) return
-
-    const localTimer = setInterval(() => {
+    if (!user) return
+    const timer = setInterval(() => {
       const started = readStartedAt()
-      if (started && isExpired(started)) void forceExpire()
+      if (started && Date.now() - started > SESSION_MAX_AGE_MS) forceExpire()
     }, 60_000)
+    return () => clearInterval(timer)
+  }, [user, forceExpire])
 
-    const serverTimer = setInterval(() => {
-      void (async () => {
-        if (await isSessionOutdated(session)) await forceExpire()
-      })()
-    }, SESSION_CHECK_INTERVAL_MS)
-
-    return () => {
-      clearInterval(localTimer)
-      clearInterval(serverTimer)
-    }
-  }, [session, forceExpire])
-
-  const signIn = useCallback(async (email: string, password: string) => {
-    const next = await signInWithPassword(email, password)
-    // 记录新的登录起点，并清除「已过期」提示
+  const signIn = useCallback(async (username: string, password: string) => {
+    const result = await apiLogin(username, password)
     writeStartedAt(Date.now())
     setSessionExpired(false)
-    setSession(next)
+    setUser(result.user)
   }, [])
 
   const signOut = useCallback(async () => {
-    await cloudSignOut()
+    try {
+      await apiLogout()
+    } catch (err) {
+      // 登出接口失败也照常清除本地登录态（token 已失效时后端会返回 401）
+      console.error('[auth] 登出失败：', err)
+    }
     clearStartedAt()
     setSessionExpired(false)
-    setSession(null)
+    setUser(null)
   }, [])
 
   const value = useMemo<AuthValue>(
     () => ({
-      session,
-      email: session?.user?.email ?? null,
+      user,
+      username: user?.username ?? null,
       loading,
       cloudEnabled,
       sessionExpired,
       signIn,
       signOut,
     }),
-    [session, loading, sessionExpired, signIn, signOut],
+    [user, loading, sessionExpired, signIn, signOut],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

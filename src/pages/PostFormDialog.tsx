@@ -8,7 +8,7 @@ import { MarkdownRenderer } from '../lib/markdown'
 import { uploadImage } from '../lib/storage'
 import { useStore } from '../store'
 import { useToast } from '../toast'
-import { todayISO, uid } from '../utils'
+import { todayISO } from '../utils'
 
 export interface PostDraft {
   title: string
@@ -142,7 +142,8 @@ export function PostFormDialog({
 
     const payload: Post = {
       ...draft,
-      id: isEdit && post ? post.id : uid(),
+      // 新增时 id 为 0，由后端生成自增主键（store 拿到真实 id 后回填）
+      id: isEdit && post ? post.id : 0,
       title: draft.title.trim(),
       category: draft.category.trim(),
       description: draft.description.trim(),

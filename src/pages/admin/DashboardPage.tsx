@@ -67,13 +67,13 @@ export function DashboardPage() {
         id: `post-${p.id}`,
         kind: 'post' as const,
         title: p.title || '（无标题）',
-        at: p.updated_at ?? p.created_at ?? p.date ?? '',
+        at: p.updatedAt ?? p.createdAt ?? p.date ?? '',
       })),
       ...projects.map((j) => ({
         id: `project-${j.id}`,
         kind: 'project' as const,
         title: j.name || '（未命名项目）',
-        at: j.updated_at ?? j.created_at ?? '',
+        at: j.updatedAt ?? j.createdAt ?? '',
       })),
     ]
     return items.sort((a, b) => toTime(b.at) - toTime(a.at)).slice(0, 6)

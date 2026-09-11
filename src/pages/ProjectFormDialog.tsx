@@ -95,7 +95,8 @@ export function ProjectFormDialog({
       links: draft.links
         .filter((l) => l.label.trim() && l.href.trim())
         .map((l) => ({ id: l.id, label: l.label.trim(), href: l.href.trim() })),
-      id: isEdit && project ? project.id : uid(),
+      // 新增时 id 为 0，由后端生成自增主键（store 拿到真实 id 后回填）
+      id: isEdit && project ? project.id : 0,
     }
 
     setSaving(true)

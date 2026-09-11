@@ -11,7 +11,7 @@ import {
 import { SyncErrorBanner } from '../../components/AdminLayout'
 import { Button, Field, Input, PageHead } from '../../components/ui'
 import { useAuth } from '../../auth/AuthProvider'
-import { getClient, upsertDocs, upsertSiteProfile } from '../../lib/cloud'
+import { apiChangePassword, createPost, createProject, saveSiteConfig } from '../../lib/api'
 import { mergeSite } from '../../lib/site'
 import { useStore } from '../../store'
 import { useToast } from '../../toast'
@@ -52,13 +52,13 @@ function parsePayload(text: string): ImportPayload {
   if (projects !== undefined && !Array.isArray(projects)) throw new Error('projects 字段必须是数组')
   if (
     Array.isArray(posts) &&
-    !posts.every((p) => isObject(p) && typeof p.id === 'string' && typeof p.title === 'string')
+    !posts.every((p) => isObject(p) && (typeof p.id === 'number' || typeof p.id === 'string') && typeof p.title === 'string')
   ) {
     throw new Error('存在缺少 id / title 的文章记录')
   }
   if (
     Array.isArray(projects) &&
-    !projects.every((j) => isObject(j) && typeof j.id === 'string' && typeof j.name === 'string')
+    !projects.every((j) => isObject(j) && (typeof j.id === 'number' || typeof j.id === 'string') && typeof j.name === 'string')
   ) {
     throw new Error('存在缺少 id / name 的项目记录')
   }
@@ -68,7 +68,7 @@ function parsePayload(text: string): ImportPayload {
 /** 数据导入导出 + 管理员密码修改 */
 export function SettingsPage() {
   const { posts, projects, site, reload } = useStore()
-  const { email } = useAuth()
+  const { username } = useAuth()
   const toast = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -144,9 +144,15 @@ export function SettingsPage() {
     if (!payload || importing) return
     setImporting(true)
     try {
-      if (payload.posts?.length) await upsertDocs('posts', payload.posts)
-      if (payload.projects?.length) await upsertDocs('projects', payload.projects)
-      if (payload.siteProfile) await upsertSiteProfile(mergeSite(payload.siteProfile))
+      // 阶段三后端尚未提供 /api/import 事务接口，暂时前端逐条新增；
+      // 阶段五后端实现导入导出后，这里改为一次性调用 /api/import（差异预览 + 事务写入）。
+      if (payload.posts?.length) {
+        for (const p of payload.posts) await createPost({ ...p, id: 0 })
+      }
+      if (payload.projects?.length) {
+        for (const p of payload.projects) await createProject({ ...p, id: 0 })
+      }
+      if (payload.siteProfile) await saveSiteConfig(mergeSite(payload.siteProfile))
       await reload()
       toast.success('导入完成，数据已更新')
       setPayload(null)
@@ -164,10 +170,6 @@ export function SettingsPage() {
 
   const changePassword = async () => {
     setPwError('')
-    if (!email) {
-      setPwError('未获取到当前账号邮箱，请重新登录')
-      return
-    }
     if (!currentPw || !newPw || !confirmPw) {
       setPwError('请填写完整的当前密码与新密码')
       return
@@ -183,17 +185,8 @@ export function SettingsPage() {
 
     setPwSaving(true)
     try {
-      const client = getClient()
-      // 先验证当前密码，避免离开座位时被他人改密
-      const { error: verifyError } = await client.auth.signInWithPassword({
-        email,
-        password: currentPw,
-      })
-      if (verifyError) throw new Error('当前密码不正确')
-
-      const { error } = await client.auth.updateUser({ password: newPw })
-      if (error) throw error
-
+      // 后端会校验旧密码；成功后吊销该用户全部 token（其他设备会话失效）
+      await apiChangePassword(currentPw, newPw)
       setCurrentPw('')
       setNewPw('')
       setConfirmPw('')
@@ -320,7 +313,7 @@ export function SettingsPage() {
             </span>
             <div>
               <h2 className="text-lg font-bold text-ink">修改密码</h2>
-              <p className="mt-0.5 text-[13px] text-ink-faint">当前账号：{email ?? '—'}</p>
+              <p className="mt-0.5 text-[13px] text-ink-faint">当前账号：{username ?? '—'}</p>
             </div>
           </div>
 

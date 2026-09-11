@@ -57,7 +57,7 @@ function SyncBadge() {
 }
 
 export function AdminLayout() {
-  const { email, signOut } = useAuth()
+  const { username, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const toast = useToast()
@@ -183,9 +183,9 @@ export function AdminLayout() {
 
             <span
               className="hidden max-w-56 truncate text-sm text-ink-soft md:inline"
-              title={email ?? ''}
+              title={username ?? ''}
             >
-              {email ?? '未登录'}
+              {username ?? '未登录'}
             </span>
 
             <button

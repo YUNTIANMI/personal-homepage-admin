@@ -1,31 +1,26 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { AlertTriangle, Eye, EyeOff, Loader2, LockKeyhole, Mail } from 'lucide-react'
+import { AlertTriangle, Eye, EyeOff, Loader2, LockKeyhole, UserRound } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { BrandLogo } from '../components/icons'
 import { Button, Field, Input, cn } from '../components/ui'
 
-/** 把 Supabase Auth 的报错转成对用户友好的中文提示（不泄露账号是否存在） */
+/** 把后端返回的报错转成对用户友好的中文提示（不泄露账号是否存在） */
 function mapAuthError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err)
-  const lower = raw.toLowerCase()
-  if (lower.includes('invalid login credentials')) return '邮箱或密码不正确'
-  if (lower.includes('email not confirmed'))
-    return '该账号邮箱尚未确认，请先在 Supabase 控制台完成邮箱确认'
-  if (lower.includes('too many requests') || lower.includes('rate limit'))
-    return '尝试过于频繁，请稍后再试'
-  if (lower.includes('failed to fetch') || lower.includes('network'))
-    return '网络连接失败，请检查网络后重试'
-  return `登录失败：${raw}`
+  if (raw.includes('用户名或密码错误')) return '用户名或密码错误'
+  if (raw.includes('账号已锁定')) return '尝试过于频繁，账号已锁定，请稍后再试'
+  if (raw.includes('网络连接失败')) return '网络连接失败，请确认后端服务已启动'
+  return raw || '登录失败'
 }
 
 export function LoginPage() {
-  const { signIn, session, loading, cloudEnabled, sessionExpired } = useAuth()
+  const { signIn, user, loading, cloudEnabled, sessionExpired } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: string } | null)?.from || '/admin'
 
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
@@ -33,16 +28,16 @@ export function LoginPage() {
 
   // 已登录访问登录页 → 直接回后台
   useEffect(() => {
-    if (!loading && session) navigate(from, { replace: true })
-  }, [loading, session, navigate, from])
+    if (!loading && user) navigate(from, { replace: true })
+  }, [loading, user, navigate, from])
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (submitting) return
 
     setError('')
-    if (!email.trim()) {
-      setError('请输入邮箱')
+    if (!username.trim()) {
+      setError('请输入用户名')
       return
     }
     if (!password) {
@@ -52,7 +47,7 @@ export function LoginPage() {
 
     setSubmitting(true)
     try {
-      await signIn(email, password)
+      await signIn(username, password)
       navigate(from, { replace: true })
     } catch (err) {
       setError(mapAuthError(err))
@@ -93,29 +88,27 @@ export function LoginPage() {
             <div className="flex items-start gap-3 rounded-lg border border-warn/40 bg-warn-soft px-4 py-3.5 text-[0.9375rem] text-warn">
               <AlertTriangle size={18} className="mt-0.5 shrink-0" />
               <div>
-                <p className="font-semibold">未配置 Supabase</p>
+                <p className="font-semibold">未连接后端服务</p>
                 <p className="mt-1 leading-relaxed">
-                  请在项目根目录创建 <code className="font-mono">.env.local</code>，填入
-                  <code className="font-mono"> VITE_SUPABASE_URL </code>与
-                  <code className="font-mono"> VITE_SUPABASE_ANON_KEY </code>后重新启动开发服务器。
+                  请确认 Spring Boot 后端已启动（默认 <code className="font-mono">localhost:8080</code>
+                  ），并已通过环境变量配置正确的 API 地址。
                 </p>
               </div>
             </div>
           ) : (
             <form noValidate onSubmit={onSubmit} className="space-y-4">
-              <Field label="邮箱">
+              <Field label="用户名">
                 <div className="relative">
-                  <Mail
+                  <UserRound
                     size={15}
                     className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint"
                   />
                   <Input
                     autoFocus
-                    type="email"
                     autoComplete="username"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@example.com"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="admin"
                     className="pl-9"
                     disabled={submitting}
                   />
@@ -177,7 +170,7 @@ export function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-xs leading-relaxed text-ink-faint">
-          仅限管理员登录 · 账号由 Supabase 控制台创建
+          仅限管理员登录 · 账号由系统内置（admin / editor）
         </p>
       </div>
     </div>

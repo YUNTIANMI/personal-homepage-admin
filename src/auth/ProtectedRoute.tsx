@@ -8,7 +8,7 @@ import { useAuth } from './AuthProvider'
  * - 未登录 → 重定向到 /login，并记录来源路径，登录后跳回
  */
 export function ProtectedRoute() {
-  const { session, loading } = useAuth()
+  const { user, loading } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -22,7 +22,7 @@ export function ProtectedRoute() {
     )
   }
 
-  if (!session) {
+  if (!user) {
     return (
       <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
     )

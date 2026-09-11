@@ -76,11 +76,11 @@ export function PostListPage() {
   const [sortKey, setSortKey] = useState<SortKey>('updated')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(1)
-  const [selected, setSelected] = useState<string[]>([])
+  const [selected, setSelected] = useState<number[]>([])
 
   /** undefined=关闭；post=null 表示新增 */
   const [editor, setEditor] = useState<{ post: Post | null } | null>(null)
-  const [pendingDelete, setPendingDelete] = useState<string[]>([])
+  const [pendingDelete, setPendingDelete] = useState<number[]>([])
   const [preview, setPreview] = useState<Post | null>(null)
 
   // 仪表盘「新增文章」快捷入口：?new=1 → 打开新增弹窗并清掉参数
@@ -107,8 +107,8 @@ export function PostListPage() {
     const dir = sortDir === 'asc' ? 1 : -1
     return [...list].sort((a, b) => {
       if (sortKey === 'title') return a.title.localeCompare(b.title, 'zh-CN') * dir
-      const av = sortKey === 'updated' ? toTime(a.updated_at ?? a.created_at ?? a.date) : toTime(a.date)
-      const bv = sortKey === 'updated' ? toTime(b.updated_at ?? b.created_at ?? b.date) : toTime(b.date)
+      const av = sortKey === 'updated' ? toTime(a.updatedAt ?? a.createdAt ?? a.date) : toTime(a.date)
+      const bv = sortKey === 'updated' ? toTime(b.updatedAt ?? b.createdAt ?? b.date) : toTime(b.date)
       return (av - bv) * dir
     })
   }, [posts, query, sortKey, sortDir])
@@ -126,7 +126,7 @@ export function PostListPage() {
   const allChecked = pageIds.length > 0 && pageIds.every((id) => selected.includes(id))
   const someChecked = pageIds.some((id) => selected.includes(id))
 
-  const toggleOne = (id: string, on: boolean) => {
+  const toggleOne = (id: number, on: boolean) => {
     setSelected((prev) => (on ? [...prev, id] : prev.filter((x) => x !== id)))
   }
   const togglePage = (on: boolean) => {

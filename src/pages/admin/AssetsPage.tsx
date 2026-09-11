@@ -16,7 +16,7 @@ import { fmtBytes, listAssets, removeAsset, uploadImage, type AssetItem } from '
 import { useToast } from '../../toast'
 import { copyToClipboard } from '../../utils'
 
-/** 媒体库：上传 / 浏览 / 复制链接 / 删除图片（存 Supabase Storage） */
+/** 媒体库：上传 / 浏览 / 复制链接 / 删除图片（走后端 /api/media/*） */
 export function AssetsPage() {
   const toast = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -77,8 +77,8 @@ export function AssetsPage() {
     if (!target) return
     setPendingDelete(null)
     try {
-      await removeAsset(target.path)
-      setItems((prev) => prev.filter((i) => i.path !== target.path))
+      await removeAsset(target.id)
+      setItems((prev) => prev.filter((i) => i.id !== target.id))
       toast.success('图片已删除')
     } catch (err) {
       console.error('[assets] 删除失败：', err)
@@ -93,7 +93,7 @@ export function AssetsPage() {
       <PageHead
         kicker="ASSETS"
         title="媒体库"
-        desc="上传的图片会存到 Supabase Storage，可在文章正文中直接引用；单张不超过 5MB，支持 PNG / JPG / WebP / GIF。"
+        desc="上传的图片由后端存储管理，可在文章正文中直接引用；单张不超过 5MB，支持 PNG / JPG / WebP / GIF。"
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading || busy}>

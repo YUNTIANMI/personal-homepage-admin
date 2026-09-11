@@ -12,13 +12,16 @@ import type { Post, Project, SiteProfile } from './types'
 import { mergeSite } from './lib/site'
 import { todayISO } from './utils'
 import {
-  COLLECTIONS,
   cloudEnabled,
+  createPost,
+  createProject,
+  deletePosts,
+  deleteProjects,
   fetchAllData,
-  removeDocs,
-  upsertDoc,
-  upsertSiteProfile,
-} from './lib/cloud'
+  saveSiteConfig,
+  updatePost,
+  updateProject,
+} from './lib/api'
 
 /**
  * 数据仓库：
@@ -28,8 +31,8 @@ import {
  * - 未配置时走【本地模式】：数据只存在当前浏览器，首次访问载入内置示例文章。
  */
 
-/** 内置示例文章的 id（示例仅 1 条，标注「示例 · 可删除」） */
-const SAMPLE_POST_ID = 'sample-welcome'
+/** 内置示例文章的 id（示例仅 1 条，标注「示例 · 可删除」；负数避开后端自增主键） */
+const SAMPLE_POST_ID = -1
 
 function buildSeedPosts(): Post[] {
   return [
@@ -104,10 +107,10 @@ interface State {
 export type Action =
   | { type: 'post/add'; post: Post }
   | { type: 'post/update'; post: Post }
-  | { type: 'post/delete'; ids: string[] }
+  | { type: 'post/delete'; ids: number[] }
   | { type: 'project/add'; project: Project }
   | { type: 'project/update'; project: Project }
-  | { type: 'project/delete'; ids: string[] }
+  | { type: 'project/delete'; ids: number[] }
   /** 保存站点配置 */
   | { type: 'site/save'; site: SiteProfile }
   /** 用云端返回的数据整体替换（初始化拉取时使用，不触发回写） */
@@ -165,43 +168,62 @@ function stampTimestamps(action: Action): Action {
     case 'post/add':
       return {
         ...action,
-        post: { ...action.post, created_at: action.post.created_at ?? now, updated_at: now },
+        post: { ...action.post, createdAt: action.post.createdAt ?? now, updatedAt: now },
       }
     case 'post/update':
-      return { ...action, post: { ...action.post, updated_at: now } }
+      return { ...action, post: { ...action.post, updatedAt: now } }
     case 'project/add':
       return {
         ...action,
         project: {
           ...action.project,
-          created_at: action.project.created_at ?? now,
-          updated_at: now,
+          createdAt: action.project.createdAt ?? now,
+          updatedAt: now,
         },
       }
     case 'project/update':
-      return { ...action, project: { ...action.project, updated_at: now } }
+      return { ...action, project: { ...action.project, updatedAt: now } }
     default:
       return action
   }
 }
 
-/** 把一次本地操作转换为对应的云端写请求 */
-function syncToCloud(action: Action): Promise<void>[] {
+/**
+ * 把一次本地操作落到后端，返回「应写入本地 state 的权威 Action」。
+ *
+ * 新增时后端生成自增主键，这里拿回真实 id 后连同本地时间戳一并回填，
+ * 保证本地列表与后端数据一致（时间戳由后端权威维护，此处先用本地时间近似，下次 reload 覆盖）。
+ */
+async function mutateCloud(action: Action): Promise<Action> {
+  const now = new Date().toISOString()
   switch (action.type) {
-    case 'post/add':
-    case 'post/update':
-      return [upsertDoc(COLLECTIONS.posts, action.post)]
-    case 'project/add':
-    case 'project/update':
-      return [upsertDoc(COLLECTIONS.projects, action.project)]
+    case 'post/add': {
+      const id = await createPost(action.post)
+      return { type: 'post/add', post: { ...action.post, id, createdAt: now, updatedAt: now } }
+    }
+    case 'post/update': {
+      await updatePost(action.post.id, action.post)
+      return { type: 'post/update', post: { ...action.post, updatedAt: now } }
+    }
     case 'post/delete':
-      return [removeDocs(COLLECTIONS.posts, action.ids)]
+      await deletePosts(action.ids)
+      return action
+    case 'project/add': {
+      const id = await createProject(action.project)
+      return { type: 'project/add', project: { ...action.project, id, createdAt: now, updatedAt: now } }
+    }
+    case 'project/update': {
+      await updateProject(action.project.id, action.project)
+      return { type: 'project/update', project: { ...action.project, updatedAt: now } }
+    }
     case 'project/delete':
-      return [removeDocs(COLLECTIONS.projects, action.ids)]
+      await deleteProjects(action.ids)
+      return action
     case 'site/save':
-      return [upsertSiteProfile(action.site)]
+      await saveSiteConfig(action.site)
+      return action
     default:
-      return []
+      return action
   }
 }
 
@@ -299,21 +321,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // 包装 dispatch：先本地更新（界面即时响应），再同步写入云端。
-  // 返回的 Promise 在云端写入成功时 resolve、失败时 reject，供表单做成功 / 失败提示。
-  const dispatch = useCallback((action: Action): Promise<void> => {
-    const stamped = stampTimestamps(action)
-    dispatchBase(stamped)
-    if (!cloudEnabled || stamped.type === 'state/replace') return Promise.resolve()
-    const tasks = syncToCloud(stamped)
-    if (tasks.length === 0) return Promise.resolve()
-    return Promise.all(tasks)
-      .then(() => setSyncStatus('synced'))
-      .catch((err) => {
-        console.error('[cloud] 写入云端失败：', err)
-        setSyncStatus('error')
-        throw err
-      })
+  // 包装 dispatch：写操作先落到后端（拿回权威 id / 时间戳），成功后再更新本地 state。
+  // 返回的 Promise 在后端写入成功时 resolve、失败时 reject，供表单做成功 / 失败提示。
+  const dispatch = useCallback(async (action: Action): Promise<void> => {
+    if (action.type === 'state/replace') {
+      dispatchBase(action)
+      return
+    }
+    if (!cloudEnabled) {
+      dispatchBase(stampTimestamps(action))
+      return
+    }
+    try {
+      const remote = await mutateCloud(action)
+      dispatchBase(remote)
+      setSyncStatus('synced')
+    } catch (err) {
+      console.error('[api] 写入后端失败：', err)
+      setSyncStatus('error')
+      throw err
+    }
   }, [])
 
   // 重新拉取云端数据：用于错误态手动重试

@@ -20,7 +20,7 @@ export function PublicSite() {
   const { posts } = useStore()
   const [theme, setTheme] = useState<Theme>(getInitialTheme)
   const [view, setViewRaw] = useState<View>('home')
-  const [readId, setReadId] = useState<string | null>(null)
+  const [readId, setReadId] = useState<number | null>(null)
 
   const setView = useCallback((v: View) => {
     setViewRaw(v)
