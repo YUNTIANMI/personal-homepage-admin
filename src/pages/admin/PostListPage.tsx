@@ -419,7 +419,6 @@ export function PostListPage() {
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-ink">{post.title || '（无标题）'}</span>
-                          {post.isSample && <Chip tone="warn">示例 · 可删除</Chip>}
                         </div>
                       </td>
                       <td className="px-4 py-3.5 font-mono text-sm whitespace-nowrap text-ink-soft">

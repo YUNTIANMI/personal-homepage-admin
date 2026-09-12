@@ -10,7 +10,6 @@ import {
 } from 'react'
 import type { Post, Project, SiteProfile } from './types'
 import { mergeSite } from './lib/site'
-import { todayISO } from './utils'
 import {
   cloudEnabled,
   createPost,
@@ -25,77 +24,9 @@ import {
 
 /**
  * 数据仓库：
- * - 配置了 VITE_SUPABASE_URL 与 VITE_SUPABASE_ANON_KEY 时走【云端存储】：
- *   启动从云数据库拉取，增删改即时同步到云端，
- *   换电脑 / 换浏览器都能看到同一份数据（localStorage 仅作为离线缓存兜底）；
- * - 未配置时走【本地模式】：数据只存在当前浏览器，首次访问载入内置示例文章。
+ * - 后端存储（cloudEnabled 恒为 true）：启动从 Spring Boot 后端拉取，
+ *   增删改即时同步；localStorage 仅作为离线缓存兜底（首屏秒开）。
  */
-
-/** 内置示例文章的 id（示例仅 1 条，标注「示例 · 可删除」；负数避开后端自增主键） */
-const SAMPLE_POST_ID = -1
-
-function buildSeedPosts(): Post[] {
-  return [
-    {
-      id: SAMPLE_POST_ID,
-      isSample: true,
-      title: '你好，世界 —— 从这里认识罗辑',
-      date: todayISO(),
-      category: '随笔',
-      tags: ['示例', 'Markdown'],
-      description:
-        '这是一条内置示例数据，用于演示文章的新增、阅读与删除流程。确认无误后可直接点击删除清理干净，再开始正式写作。',
-      content: `欢迎来到 **罗辑个人主页**。我是软件工程方向的学习者与开发者，这个站点用来沉淀我的技术博客与软件项目。
-
-> 提示：本条为内置**示例数据**（已标注“示例 · 可删除”），你可以直接把它删除，随后使用右上角「新增文章」创建属于你自己的文章。下方同时演示了本站 Markdown 的渲染能力。
-
-## 支持的能力
-
-本站正文完全使用 Markdown 编写，支持：
-
-- GFM 语法：~~删除线~~、[超链接](https://github.com)、行内 \`code\`
-- 代码块语法高亮（浅色 / 深色主题自适应）
-- 表格、任务列表、引用、分隔线等
-
-## 一段 TypeScript
-
-\`\`\`ts
-interface Engineer {
-  name: string
-  focus: 'frontend' | 'backend' | 'fullstack'
-}
-
-const luoji: Engineer = {
-  name: '罗辑',
-  focus: 'fullstack',
-}
-
-export function greet(person: Engineer): string {
-  return \`Hello, I'm \${person.name} — software engineer.\`
-}
-\`\`\`
-
-## 表格示例
-
-| 章节 | 内容 | 状态 |
-| --- | --- | --- |
-| 新增 | 填写表单写入列表 | ✅ |
-| 编辑 | 回填表单并保存 | ✅ |
-| 删除 | 单行 / 批量 | ✅ |
-
-## 任务列表
-
-- [x] 支持 Markdown 渲染
-- [x] 支持代码高亮
-- [ ] 等待你发布的第一篇文章
-
----
-
-试试在上方列表对该文章执行 **编辑** 或 **删除**，体验完整的数据管理流程。
-`,
-    },
-  ]
-}
 
 interface State {
   posts: Post[]
@@ -140,51 +71,16 @@ function readLocalCache(): State | null {
 
 /**
  * 初始状态：
- * - 有本地缓存 → 先用缓存渲染（首屏不闪空白），云端拉取后再覆盖；
- * - 无缓存且未启用云端 → 注入内置示例文章；
- * - 无缓存且启用云端 → 返回空，等云端数据（不把示例写进云）。
+ * - 有本地缓存 → 先用缓存渲染（首屏不闪空白），后端拉取后再覆盖；
+ * - 无缓存 → 返回空，等后端数据。
  */
 function loadState(): State {
   const cached = readLocalCache()
   if (cached) return cached
   return {
-    posts: cloudEnabled ? [] : buildSeedPosts(),
+    posts: [],
     projects: [],
     site: mergeSite(null),
-  }
-}
-
-/**
- * 为新增 / 更新的内容补上本地时间戳。
- *
- * 云端 `updated_at` 由数据库触发器维护，但本地对象拿不到该值，导致：
- * - 「按更新时间」排序时刚保存的内容不置顶；
- * - 仪表盘「最近更新」滞后于实际编辑。
- * 因此本地先盖一个 ISO 时间戳，写入云端后由触发器覆盖为权威值。
- */
-function stampTimestamps(action: Action): Action {
-  const now = new Date().toISOString()
-  switch (action.type) {
-    case 'post/add':
-      return {
-        ...action,
-        post: { ...action.post, createdAt: action.post.createdAt ?? now, updatedAt: now },
-      }
-    case 'post/update':
-      return { ...action, post: { ...action.post, updatedAt: now } }
-    case 'project/add':
-      return {
-        ...action,
-        project: {
-          ...action.project,
-          createdAt: action.project.createdAt ?? now,
-          updatedAt: now,
-        },
-      }
-    case 'project/update':
-      return { ...action, project: { ...action.project, updatedAt: now } }
-    default:
-      return action
   }
 }
 
@@ -242,11 +138,7 @@ function reducer(state: State, action: Action): State {
     case 'post/update':
       return {
         ...state,
-        posts: state.posts.map((p) => {
-          if (p.id !== action.post.id) return p
-          // 编辑过的数据不再视为示例
-          return { ...action.post, isSample: false }
-        }),
+        posts: state.posts.map((p) => (p.id === action.post.id ? action.post : p)),
       }
     case 'post/delete':
       return { ...state, posts: state.posts.filter((p) => !action.ids.includes(p.id)) }
@@ -255,9 +147,7 @@ function reducer(state: State, action: Action): State {
     case 'project/update':
       return {
         ...state,
-        projects: state.projects.map((p) =>
-          p.id === action.project.id ? { ...action.project, isSample: false } : p,
-        ),
+        projects: state.projects.map((p) => (p.id === action.project.id ? action.project : p)),
       }
     case 'project/delete':
       return { ...state, projects: state.projects.filter((p) => !action.ids.includes(p.id)) }
@@ -309,9 +199,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const remote = await fetchAllData()
         if (cancelled) return
 
-        // 注意：这里不再做「本地数据迁移上传」。
-        // 展示站点对所有访客开放，任何隐式写入都会被 RLS 拒绝并污染同步状态；
-        // 内容写入只允许在后台（登录态）显式发生。
+        // 内容写入只在后台（登录态）显式发生，这里仅读取，不做任何隐式写入。
         dispatchBase({
           type: 'state/replace',
           posts: remote.posts,
@@ -334,10 +222,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const dispatch = useCallback(async (action: Action): Promise<void> => {
     if (action.type === 'state/replace') {
       dispatchBase(action)
-      return
-    }
-    if (!cloudEnabled) {
-      dispatchBase(stampTimestamps(action))
       return
     }
     try {

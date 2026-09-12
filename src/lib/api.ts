@@ -17,10 +17,6 @@ const API_BASE = String(import.meta.env.VITE_API_BASE ?? 'http://localhost:8080/
 /** 是否启用后端存储（后端改造后恒为 true） */
 export const cloudEnabled = true
 
-/** 保留集合名常量，兼容 store 对 COLLECTIONS 的引用 */
-export const COLLECTIONS = { posts: 'posts', projects: 'projects' } as const
-export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS]
-
 /* ---------------- token 管理 ---------------- */
 
 const ACCESS_KEY = 'luoji.admin.accessToken'

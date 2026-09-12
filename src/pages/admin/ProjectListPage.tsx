@@ -176,7 +176,6 @@ export function ProjectListPage() {
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-ink">{project.name || '（未命名）'}</span>
-                          {project.isSample && <Chip tone="warn">示例 · 可删除</Chip>}
                         </div>
                       </td>
                       <td className="px-4 py-3.5 text-ink-soft">

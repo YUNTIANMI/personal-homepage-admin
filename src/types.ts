@@ -16,8 +16,6 @@ export interface Post {
   isTop?: number
   /** 同组内排序权重，越大越靠前 */
   sort?: number
-  /** 内置示例数据标记，展示可删除标识；被编辑或删除后即视为普通数据 */
-  isSample?: boolean
   /** 创建时间（后端返回，ISO 字符串） */
   createdAt?: string
   /** 最近更新时间（后端返回，ISO 字符串） */
@@ -48,8 +46,6 @@ export interface Project {
   tagline: string
   tech: string[]
   links: ProjectLink[]
-  /** 内置示例数据标记 */
-  isSample?: boolean
   /** 创建时间（后端返回，ISO 字符串） */
   createdAt?: string
   /** 最近更新时间（后端返回，ISO 字符串） */

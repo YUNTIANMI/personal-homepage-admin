@@ -32,7 +32,7 @@
 | 接口文档 | springdoc-openapi（Swagger UI） |
 | 部署 | Docker + Docker Compose + GitHub Actions CI |
 
-## 三、后端能力清单（阶段一 ~ 五已完成）
+## 三、后端能力清单（阶段一 ~ 六已完成）
 
 | 能力 | 落地 |
 | --- | --- |
@@ -117,6 +117,8 @@ npm run dev
 | 展示站点 | `http://localhost:5174/` |
 | 后台登录 | `http://localhost:5174/login` |
 
+> **Windows 一键启动**：项目根目录的 `start.bat` 会自动完成「起 MySQL/Redis → 起后端 → 起前端 → 打开浏览器」，双击即可（需已装 Docker Desktop 与 Node.js）。
+
 ### 4.5 环境变量
 
 **前端**（`.env.local`，已被 gitignore）：
@@ -182,12 +184,12 @@ backend/                          Spring Boot 后端（Java 17 + MyBatis-Plus + 
     └── resources/db/migration/   Flyway 建表与种子数据
 src/                              前端（React + TypeScript）
 ├── lib/api.ts                    自研后端 API 数据层（fetch 封装 + JWT + 自动 refresh）
-├── lib/storage.ts                媒体上传
-├── store.tsx                     数据仓库
+├── lib/storage.ts                媒体上传（走后端 /api/media/*）
+├── lib/site.ts / markdown.tsx    站点配置合并 / Markdown 渲染
+├── store.tsx                     数据仓库（后端同步 + localStorage 离线缓存）
 ├── auth/                         AuthProvider + ProtectedRoute
 └── pages/                        展示站点页面 + 后台页面
 docs/                             需求 / 架构 / 开发 / 排期文档
-supabase/migrations/              （历史遗留，已不再使用，后端改用 Flyway）
 ```
 
 ## 七、相关文档
