@@ -213,7 +213,7 @@ export function SettingsPage() {
             </span>
             <div>
               <h2 className="text-lg font-bold text-ink">导出数据</h2>
-              <p className="mt-0.5 text-[13px] text-ink-faint">
+              <p className="mt-0.5 text-sm text-ink-faint">
                 当前：{posts.length} 篇文章 · {projects.length} 个项目 · 站点配置
               </p>
             </div>
@@ -236,11 +236,11 @@ export function SettingsPage() {
             </span>
             <div>
               <h2 className="text-lg font-bold text-ink">导入数据</h2>
-              <p className="mt-0.5 text-[13px] text-ink-faint">先导出备份，再导入更安全</p>
+              <p className="mt-0.5 text-sm text-ink-faint">先导出备份，再导入更安全</p>
             </div>
           </div>
 
-          <div className="mt-4 flex items-start gap-2 rounded-lg border border-warn/40 bg-warn-soft px-3.5 py-2.5 text-[13px] leading-relaxed text-warn">
+          <div className="mt-4 flex items-start gap-2 rounded-lg border border-warn/40 bg-warn-soft px-3.5 py-2.5 text-sm leading-relaxed text-warn">
             <AlertTriangle size={15} className="mt-0.5 shrink-0" />
             <span>
               导入会按 <code className="font-mono">id</code> 覆盖同 id 的内容，
@@ -260,7 +260,7 @@ export function SettingsPage() {
             <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={importing}>
               <FileJson size={15} /> 选择 JSON 文件
             </Button>
-            {filename && <span className="font-mono text-xs text-ink-faint">{filename}</span>}
+            {filename && <span className="font-mono text-sm text-ink-faint">{filename}</span>}
           </div>
 
           {diff && (
@@ -307,7 +307,7 @@ export function SettingsPage() {
             </span>
             <div>
               <h2 className="text-lg font-bold text-ink">修改密码</h2>
-              <p className="mt-0.5 text-[13px] text-ink-faint">当前账号：{username ?? '—'}</p>
+                          <p className="mt-0.5 text-sm text-ink-faint">当前账号：{username ?? '—'}</p>
             </div>
           </div>
 
@@ -353,7 +353,7 @@ export function SettingsPage() {
               {pwSaving ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />}
               {pwSaving ? '提交中…' : '更新密码'}
             </Button>
-            <span className="text-[13px] text-ink-faint">
+            <span className="text-sm text-ink-faint">
               修改成功后，其他设备上的登录会话会失效，需要重新登录。
             </span>
           </div>

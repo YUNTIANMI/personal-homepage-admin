@@ -24,8 +24,8 @@ const variantCls: Record<BtnVariant, string> = {
 }
 
 const sizeCls: Record<BtnSize, string> = {
-  sm: 'h-9 gap-1.5 px-3.5 text-[13px]',
-  md: 'h-12 gap-2 px-6 text-[0.9375rem]',
+  sm: 'h-9 gap-1.5 px-3.5 text-sm',
+  md: 'h-12 gap-2 px-6 text-base',
 }
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -81,7 +81,7 @@ export function IconBtn({
 
 /* ---------------- 表单输入 ---------------- */
 export const inputCls =
-  'input-base min-w-0 h-11 text-[15px] disabled:pointer-events-none disabled:opacity-50'
+  'input-base min-w-0 h-11 text-base disabled:pointer-events-none disabled:opacity-50'
 
 /* 用 forwardRef 暴露原生节点，便于在编辑器里做「光标处插入」等操作 */
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
@@ -122,12 +122,12 @@ export function Field({
       )}
       {children}
       {error ? (
-        <p className="flex items-center gap-1 text-[13px] text-danger">
+        <p className="flex items-center gap-1 text-sm text-danger">
           <span className="inline-block size-1.5 rounded-full bg-danger" />
           {error}
         </p>
       ) : hint ? (
-        <p className="text-[13px] text-ink-faint">{hint}</p>
+        <p className="text-sm text-ink-faint">{hint}</p>
       ) : null}
     </div>
   )
@@ -195,7 +195,7 @@ export function EmptyState({
         {icon}
       </div>
       <p className="mt-5 text-lg font-semibold text-ink">{title}</p>
-      <p className="mt-2 max-w-md text-[0.9375rem] leading-relaxed text-ink-faint">{desc}</p>
+      <p className="mt-2 max-w-md text-base leading-relaxed text-ink-faint">{desc}</p>
       {action && <div className="mt-5">{action}</div>}
     </div>
   )
@@ -221,7 +221,7 @@ export function PageHead({
           {title}
         </h1>
         {desc && (
-          <p className="mt-3 max-w-2xl text-[0.9375rem] leading-relaxed text-ink-soft">{desc}</p>
+          <p className="mt-3 max-w-2xl text-base leading-relaxed text-ink-soft">{desc}</p>
         )}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
