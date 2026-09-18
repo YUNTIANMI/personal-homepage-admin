@@ -6,7 +6,7 @@
  */
 import { getAccessToken, request, type ApiError } from './api'
 
-const API_BASE = String(import.meta.env.VITE_API_BASE ?? 'http://localhost:8080/api').replace(/\/+$/, '')
+const API_BASE = String(import.meta.env.VITE_API_BASE ?? 'http://localhost:8082/api').replace(/\/+$/, '')
 
 /** 单文件上限（与后端 MediaServiceImpl 保持一致） */
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024

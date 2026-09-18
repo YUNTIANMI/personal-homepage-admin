@@ -61,13 +61,25 @@ if not defined MVN (
     exit /b 1
 )
 
-REM ============ [4/5] 启动后端（已运行则跳过）============
+REM ============ [4/5] 启动后端（用 /api/ping 校验，已运行则跳过）============
 echo [4/5] 启动后端 ...
-netstat -ano | findstr ":8080 " | findstr "LISTENING" >nul 2>&1
+call :probe_backend
 if not errorlevel 1 (
-    echo       后端已在运行，跳过。
+    echo       后端已在运行（/api/ping 正常），跳过启动。
 ) else (
-    start "luoji-backend" /D "%~dp0backend" cmd /k "set DB_PORT=3307&& set DB_USER=luoji&& set DB_PASSWORD=luoji123456&& set DB_NAME=luoji_blog&& %MVN% spring-boot:run"
+    netstat -ano | findstr ":8082 " | findstr "LISTENING" >nul 2>&1
+    if not errorlevel 1 (
+        echo.
+        echo [错误] 端口 8082 已被其它程序占用，但它不是 luoji 后端。
+        echo        请关闭占用 8082 的程序，或修改 backend 端口后重试。
+        echo.
+        pause
+        exit /b 1
+    )
+    echo       正在启动后端（首次编译较慢，请耐心等待）...
+    start "luoji-backend" /D "%~dp0backend" cmd /k "set SERVER_PORT=8082&& set DB_PORT=3307&& set DB_USER=luoji&& set DB_PASSWORD=luoji123456&& set DB_NAME=luoji_blog&& %MVN% spring-boot:run"
+    set /a BWAIT=0
+    call :wait_backend
 )
 
 REM ============ [5/5] 启动前端（已运行则跳过）============
@@ -94,7 +106,7 @@ echo   完成！
 echo.
 echo   前端站点:  http://localhost:5174
 echo   后台登录:  http://localhost:5174/login
-echo   接口文档:  http://localhost:8080/swagger-ui.html
+echo   接口文档:  http://localhost:8082/swagger-ui.html
 echo.
 echo   登录账号:  admin / admin123
 echo              editor / editor123
@@ -103,3 +115,30 @@ echo   停止服务:  关闭「luoji-backend」「luoji-frontend」两个窗口
 echo ================================================
 echo.
 pause
+exit /b 0
+
+REM ============ 子程序：探测后端是否就绪（校验 /api/ping 返回 pong）============
+:probe_backend
+where curl >nul 2>nul
+if errorlevel 1 goto probe_backend_ps
+curl -s -m 3 "http://localhost:8082/api/ping" 2>nul | findstr /i "pong" >nul
+if errorlevel 1 exit /b 1
+exit /b 0
+
+:probe_backend_ps
+powershell -NoProfile -Command "try{if((Invoke-WebRequest -Uri 'http://localhost:8082/api/ping' -TimeoutSec 3 -UseBasicParsing).Content -match 'pong'){exit 0}else{exit 1}}catch{exit 1}" >nul 2>&1
+if errorlevel 1 exit /b 1
+exit /b 0
+
+REM ============ 子程序：等待后端就绪（最多 120 秒）============
+:wait_backend
+timeout /t 3 >nul
+set /a BWAIT+=3
+call :probe_backend
+if not errorlevel 1 (
+    echo       后端已就绪（用时 %BWAIT% 秒）。
+    exit /b 0
+)
+if %BWAIT% lss 120 goto wait_backend
+echo [警告] 已等待 %BWAIT% 秒后端仍未就绪，请查看「luoji-backend」窗口日志。
+exit /b 0

@@ -64,9 +64,9 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:-please-change-me-in-production-0123456789abcdef0123456789}
-      SERVER_PORT: 8080
+      SERVER_PORT: 8082
     ports:
-      - "8080:8080"
+      - "8082:8082"
 
 volumes:
   mysql-data:

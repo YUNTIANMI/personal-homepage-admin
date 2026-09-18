@@ -11,8 +11,8 @@
  */
 import type { AuthSession, AuthUser, Post, PostRevision, Project, SiteProfile } from '../types'
 
-/** 后端 API 根地址（可被 VITE_API_BASE 覆盖，默认本地 8080） */
-const API_BASE = String(import.meta.env.VITE_API_BASE ?? 'http://localhost:8080/api').replace(/\/+$/, '')
+/** 后端 API 根地址（可被 VITE_API_BASE 覆盖，默认本地 8082） */
+const API_BASE = String(import.meta.env.VITE_API_BASE ?? 'http://localhost:8082/api').replace(/\/+$/, '')
 
 /** 是否启用后端存储（后端改造后恒为 true） */
 export const cloudEnabled = true

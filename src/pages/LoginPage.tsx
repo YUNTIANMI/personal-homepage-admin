@@ -90,7 +90,7 @@ export function LoginPage() {
               <div>
                 <p className="font-semibold">未连接后端服务</p>
                 <p className="mt-1 leading-relaxed">
-                  请确认 Spring Boot 后端已启动（默认 <code className="font-mono">localhost:8080</code>
+                  请确认 Spring Boot 后端已启动（默认 <code className="font-mono">localhost:8082</code>
                   ），并已通过环境变量配置正确的 API 地址。
                 </p>
               </div>
